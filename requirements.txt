@@ -1,0 +1,9 @@
+numpy
+pandas
+scipy
+scikit-learn
+requests
+beautifulsoup4
+# needed for the full original stage 4 inside main_beast (TFT army + LightGBM); pre-installed in Colab:
+# lightgbm
+# torch

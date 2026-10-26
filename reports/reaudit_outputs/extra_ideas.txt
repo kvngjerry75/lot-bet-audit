@@ -1,0 +1,29 @@
+
+### Afriluck: TEST = last 750 draws (chance 2+ in 10-core 28.1%)
+
+| model | 2+ in 10-core | hits in top k | log-score gain vs chance |
+|---|---|---|---|
+| CURRENT model | 32.0% | 0.696 | +0.00745 |
+| PL from exit order, prior 50 | 32.1% | 0.681 | +0.00468 |
+| PL from exit order, prior 300 | 33.1% | 0.671 | +0.00774 |
+| 12-exit model (machine numbers) | 30.9% | 0.640 | -0.00324 |
+| CURRENT x 12-exit (product) | 30.1% | 0.676 | -0.00349 |
+
+### DayWA: did the balls or the bias change over time? (300 shuffles of the draw order)
+
+- cusum_low: real 0.86, shuffled mean 0.84, p = 0.412
+- split: real 41.98, shuffled mean 48.95, p = 0.867
+- block: real 230.23, shuffled mean 240.62, p = 0.661
+- per-ball counts spread (chi2): real 37.2 vs fair 38.4, p = 0.545
+
+### NLA 5/90 games: current-style model vs 100 fair machines (2+ in 10-core, all draws after 300)
+
+| game | draws | model 2+ in 10-core | fair machines mean | p | hits in top 5 | fair mean | p |
+|---|---|---|---|---|---|---|---|
+| Main | 2833 | 9.5% | 9.4% | 0.45 | 0.291 | 0.279 | 0.15 |
+| Noonrush | 933 | 9.2% | 9.4% | 0.62 | 0.261 | 0.278 | 0.83 |
+| VAG | 2039 | 9.1% | 9.4% | 0.73 | 0.287 | 0.279 | 0.33 |
+
+real	3m27.770s
+user	3m22.893s
+sys	0m0.266s

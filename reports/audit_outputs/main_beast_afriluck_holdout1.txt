@@ -1,0 +1,43 @@
+MAIN BEAST: Afriluck (Anopa+Midday+evening) | 2060 draws used (2024-06-29 to 2026-10-25) | latest 1 draw(s) HIDDEN
+
+Backtest on draws 560..2059 (2025-04-05 to 2026-10-25; every draw forecast from earlier draws only; same draws for every row so the rows compare fairly):
+| component | 2+ in 10-core | hits in top k | Perm-2 back per GH₵1 (top 10 / top 3) | trust now |
+|---|---|---|---|---|
+| MAIN BEAST (chance + sharp + colour) | 31.5% | 0.671 | 0.646 / 0.707 | - |
+| quick frequency | 30.7% | 0.667 | 0.636 / 0.600 | not a member |
+| quick recent50 | 27.7% | 0.641 | 0.597 / 0.627 | not a member |
+| quick overdue | 24.6% | 0.586 | 0.484 / 0.493 | not a member |
+| quick markov | 28.7% | 0.635 | 0.591 / 0.493 | not a member |
+| quick boosting | 31.5% | 0.685 | 0.654 / 0.667 | not a member |
+| rule engine | 30.0% | 0.631 | 0.605 / 0.640 | not a member |
+| stage5 forecaster | 29.9% | 0.670 | 0.558 / 0.493 | not a member |
+| sharp | 31.5% | 0.671 | 0.646 / 0.707 | 0.42 |
+| colour only | 30.9% | 0.668 | 0.597 / 0.640 | 0.57 |
+| pure chance | 28.1% | 0.632 | 0.564 / 0.564 | 0.00 |
+
+9 models run in 35s (FAST mode: the original stage 4 was skipped); the BEAST combines chance, sharp, colour only
+
+LATEST DRAW IN YOUR DATA: 2026-10-25 (evening)
+FORECASTING: the next Afriluck draw after 2026-10-25 evening, i.e. Anopa on Monday 2026-10-26. All three Afriluck games use the same machine and balls, so this core also holds for any later Anopa / Midday / evening draw until you add new results.
+Forecast: top 6 [16, 1, 9, 21, 23, 24] | 10-ball core [16, 1, 9, 21, 23, 24, 12, 6, 25, 13] | strongest ball x1.054 chance
+
+MONEY: even if the pink bias were known exactly, the best bet (perm2) returns about 62% per GH₵1 (at most 65% at the top of its 95% interval). Perm-2 62%, Banker 59%, Direct-1 55%, Direct-3 48%, Direct-4 47%. NO Afriluck bet has a positive expected value. If you play anyway, the smallest expected loss is Perm-2 on pink balls only; the top 3 (3 pairs, GH₵3 a draw) keeps the loss per draw smallest: about GH₵1.13 a draw on average. Run bet_lab.py for the full GH₵ table.
+
+The 10 draws before it, each forecast blind by the same combined system:
+  2026-10-22: drawn [51, 55, 45, 16, 28, 53] | 1 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-22: drawn [48, 5, 19, 32, 40, 55] | 0 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-22: drawn [34, 51, 13, 50, 23, 33] | 1 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-23: drawn [37, 21, 41, 16, 25, 26] | 3 in the 10-core | Perm-2 GH₵45 -> GH₵180
+  2026-10-23: drawn [12, 43, 48, 55, 40, 13] | 1 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-23: drawn [13, 41, 31, 4, 6, 23] | 3 in the 10-core | Perm-2 GH₵45 -> GH₵180
+  2026-10-24: drawn [3, 52, 26, 32, 23, 46] | 1 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-24: drawn [39, 55, 25, 28, 52, 43] | 1 in the 10-core | Perm-2 GH₵45 -> GH₵0
+  2026-10-24: drawn [6, 5, 24, 44, 1, 45] | 3 in the 10-core | Perm-2 GH₵45 -> GH₵180
+  2026-10-25: drawn [28, 17, 18, 47, 33, 31] | 0 in the 10-core | Perm-2 GH₵45 -> GH₵0
+
+HIDDEN DRAW 2026-10-26: actual numbers [52, 16, 1, 15, 6, 26]
+  10-ball core [16, 1, 9, 21, 23, 24, 12, 6, 25, 13]: 3 of the 6 winning numbers inside
+  Perm-2 on the core (45 pairs x GH₵1 = GH₵45): 3 winning pair(s) x 60 = GH₵180 -> PROFIT of GH₵135
+  Perm-2 on the top 3 [16, 1, 9] (3 pairs = GH₵3): 1 winning pair(s) -> GH₵+57
+  Direct-2 on [16, 1] (GH₵1): WIN GH₵60
+  Direct-1 first ball on 16 (GH₵1): lost GH₵1 (first ball drawn: 52)

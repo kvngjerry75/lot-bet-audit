@@ -1,0 +1,16 @@
+# Sharp predictor: Afriluck (2061 draws, 2024-06-29 to 2026-10-26); scored on 1761 draws, each from earlier draws only
+
+| model | 2+ in 10-core | 3+ in core | hits in top 6 | top-2 both | log-loss skill | Perm-2 back |
+|---|---|---|---|---|---|---|
+| chance | 28.1% | 6.0% | 0.632 | 0.94% | 0 | 56% |
+| colour / low-high only | 555 = 31.5% | 7.3% | 0.696 | 0.91% | +0.00041 | 65% |
+| SHARP (self-tuning hierarchical) | 556 = 31.6% | 7.0% | 0.676 | 1.14% | +0.00040 | 64% |
+| ORACLE (cheats, sees the future) | 596 = 33.8% | 8.6% | 0.738 | 1.14% | +0.00144 | 73% |
+
+SHARP vs 200 fair-machine histories (p = share of fair controls doing at least as well):
+  2+ in core: 0.3157 vs fair mean 0.2821, p = 0.005
+  hits in top 6: 0.6758 vs fair mean 0.6320, p = 0.010
+  log-loss skill: 0.0004 vs fair mean -0.0000, p = 0.005
+
+Versions it trusts most now: pull none / half-life none (0.22); pull none / half-life 1500 (0.21); pull none / half-life 800 (0.21)
+Current 10-ball core: [16, 1, 9, 21, 23, 24, 12, 6, 25, 13] | strongest ball x1.063 chance

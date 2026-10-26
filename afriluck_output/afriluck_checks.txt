@@ -1,0 +1,7 @@
+26MIDDAY397_MN 2026-03-10: odd result 'null'
+26ANOPA469_MN 2026-03-10: odd result 'null'
+unrecognised draw code '24MIDDAY-24' (kept in raw file only)
+24ANOPA022A 2024-08-28: odd result ''
+midday: 16 draw numbers missing between 1 and 593: [24, 102, 118, 333, 334, 339, 346, 394, 406, 408, 418, 420, 442, 464, 496, 564]
+evening: 77 draw numbers missing between 181 and 1090: [360, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385] ...
+anopa: 16 draw numbers missing between 1 and 665: [93, 174, 190, 405, 406, 411, 418, 466, 478, 480, 490, 492, 514, 536, 568, 636]

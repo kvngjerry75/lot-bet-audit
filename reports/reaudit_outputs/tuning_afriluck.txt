@@ -1,0 +1,12 @@
+# Afriluck: TUNE draws 300-1310, TEST draws 1311-2060 (2026-01-13 to 2026-10-26); chance 2+ in 10-core = 28.1%
+
+| pipeline | TUNE 2+ in core | TEST 2+ in core | TEST 3+ | TEST hits in top k | TEST ticket 2+ of k | TEST log-score gain |
+|---|---|---|---|---|---|---|
+| chance | 30.9% | 30.8% | 5.7% | 0.640 | 11.7% | +0.00000 |
+| CURRENT: sharp-style (halves, BMA of 16) | 32.0% | 32.0% | 6.4% | 0.696 | 14.1% | +0.00745 |
+| best on TUNE by hit rate [quarters, pull None, hl None] | 32.2% | 30.9% | 7.6% | 0.660 | 13.6% | +0.00848 |
+| best on TUNE by log-score [halves, pull None, hl 250.0] | 31.6% | 30.5% | 7.2% | 0.681 | 13.2% | +0.00604 |
+| BMA of every candidate | 30.3% | 30.7% | 5.5% | 0.669 | 11.7% | +0.00741 |
+| BMA of TUNE top-5 by log-score | 31.6% | 28.8% | 7.6% | 0.656 | 12.1% | +0.00753 |
+
+124 candidates searched. If no tuned row beats the CURRENT row on TEST, extra tuning only fits noise.

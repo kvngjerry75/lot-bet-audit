@@ -1,0 +1,36 @@
+MAIN BEAST: Afriluck (Anopa+Midday+evening) | 2061 draws used (2024-06-29 to 2026-10-26)
+WasShifted is constant 0: the feature carries no information on this file
+  !! torch is not installed: the TFT army (5 neural nets) is SKIPPED. In Colab it is pre-installed; on a PC: pip install torch
+  original stage 4: experts ['ranker', 'hazard', 'markov', 'anchor', 'mlp', 'booster', 'rulemine'], scoring draws 361..2060 (retrained every 100 draws), long-run frequency ALLOWED. This is the slow part.
+  original stage 4 finished in 51s
+Forecasts saved to afl.npz
+
+Backtest on draws 561..2060 (2025-04-05 to 2026-10-26; every draw forecast from earlier draws only; same draws for every row so the rows compare fairly):
+| component | 2+ in 10-core | hits in top k | Perm-2 back per GH₵1 (top 10 / top 3) | trust now |
+|---|---|---|---|---|
+| MAIN BEAST (chance + sharp + colour) | 31.5% | 0.671 | 0.644 / 0.720 | - |
+| stage4 ORIGINAL ensemble | 26.7% | 0.606 | 0.528 / 0.613 | not a member |
+| stage4 ranker | 29.1% | 0.643 | 0.592 / 0.653 | not a member |
+| stage4 hazard | 26.3% | 0.593 | 0.522 / 0.520 | not a member |
+| stage4 markov | 27.3% | 0.608 | 0.519 / 0.373 | not a member |
+| stage4 anchor | 27.7% | 0.610 | 0.554 / 0.680 | not a member |
+| stage4 mlp | 29.7% | 0.671 | 0.619 / 0.733 | not a member |
+| stage4 booster | 28.9% | 0.629 | 0.580 / 0.600 | not a member |
+| quick frequency | 31.1% | 0.671 | 0.630 / 0.680 | not a member |
+| quick recent50 | 27.5% | 0.635 | 0.594 / 0.533 | not a member |
+| quick overdue | 24.9% | 0.583 | 0.482 / 0.493 | not a member |
+| quick markov | 28.7% | 0.634 | 0.588 / 0.493 | not a member |
+| quick boosting | 31.3% | 0.688 | 0.653 / 0.627 | not a member |
+| rule engine | 30.0% | 0.630 | 0.605 / 0.640 | not a member |
+| stage5 forecaster | 29.9% | 0.669 | 0.558 / 0.493 | not a member |
+| sharp | 31.5% | 0.671 | 0.644 / 0.720 | 0.43 |
+| colour only | 31.5% | 0.673 | 0.643 / 0.640 | 0.57 |
+| pure chance | 28.1% | 0.632 | 0.564 / 0.564 | 0.00 |
+
+16 models run in 86s; the BEAST combines chance, sharp, colour only
+
+LATEST DRAW IN YOUR DATA: 2026-10-26 (Anopa)
+FORECASTING: the next Afriluck draw after 2026-10-26 Anopa, i.e. Midday on Monday 2026-10-26. All three Afriluck games use the same machine and balls, so this core also holds for any later Anopa / Midday / evening draw until you add new results.
+Forecast: top 6 [16, 1, 9, 21, 23, 24] | 10-ball core [16, 1, 9, 21, 23, 24, 12, 6, 25, 13] | strongest ball x1.056 chance
+
+MONEY: even if the pink bias were known exactly, the best bet (perm2) returns about 62% per GH₵1 (at most 65% at the top of its 95% interval). Perm-2 62%, Banker 59%, Direct-1 55%, Direct-3 48%, Direct-4 47%. NO Afriluck bet has a positive expected value. If you play anyway, the smallest expected loss is Perm-2 on pink balls only; the top 3 (3 pairs, GH₵3 a draw) keeps the loss per draw smallest: about GH₵1.13 a draw on average. Run bet_lab.py for the full GH₵ table.

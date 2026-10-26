@@ -1,0 +1,112 @@
+# Sports lab: 238,854 matches, 2000-07-28 to 2026-09-03, 38 divisions
+
+  ratings built in 3s
+  models fitted in 36s
+
+DEV (settings chosen here): 98,255 matches 2005-07 to 2016-06 | TEST (scored once): 113,149 matches 2016-07 to 2026-09-03
+Bet365 median margin on 1X2 in TEST: 6.5%; over/under 2.5: 6.0%
+
+## How good are the forecasts? (TEST, log-loss: lower = better)
+
+| forecaster | log-loss |
+|---|---|
+| no information (base rates) | 1.0739 |
+| results-only rating model (S4) | 1.0220 |
+| Bet365's prices (margin removed) | 1.0018 |
+| model + market (S5) | 1.0014 |
+
+## Settings chosen on DEV (value threshold with the best DEV return, 300+ bets)
+
+- S4 results-only model, value at Bet365: EV > 0%
+- S4b results-only model, value at BEST price: EV > 20%
+- S5 model + market, value at Bet365: EV > 5%
+- S5b model + market, value at BEST price: EV > 20%
+- S7 BEST price beats Bet365 fair price: EV > 10%
+- S6 goals model, over/under at Bet365: EV > 20%
+- S6b goals model + market, over/under at Bet365: EV > 5%
+- S6c goals model + market, over/under at BEST price: EV > 5%
+- S7b BEST over/under price beats Bet365 fair price: EV > 3%
+- S8 BEST price beats Bet365 fair, short prices only: EV > 5%, price <= 2.5
+
+### TEST 2016-07 to 2026-09-03: every strategy, flat GH₵10 a bet (BH q across all 24 rows)
+
+| strategy | bets | win rate | avg odds | back per GH₵1 (95% CI) | net GH₵ | deepest fall | longest losing run | p (beats break-even) | BH q |
+|---|---|---|---|---|---|---|---|---|---|
+| S1 every home at Bet365 | 113,029 | 43.8% | 2.57 | 0.940 (0.933-0.948) | -67,329 | -67,390 | 19 | 1.000 | 1.000 |
+| S1 every draw at Bet365 | 113,029 | 26.2% | 3.73 | 0.934 (0.926-0.943) | -74,172 | -74,549 | 35 | 1.000 | 1.000 |
+| S1 every away at Bet365 | 113,029 | 30.0% | 3.98 | 0.903 (0.893-0.913) | -109,668 | -109,822 | 35 | 1.000 | 1.000 |
+| S2 every favourite | 113,029 | 50.4% | 1.99 | 0.955 (0.949-0.961) | -51,103 | -51,193 | 16 | 1.000 | 1.000 |
+| S2 every price 1-1.3 | 5,032 | 82.8% | 1.20 | 0.991 (0.978-1.003) | -475 | -537 | 5 | 0.930 | 1.000 |
+| S2 every price 1.3-1.6 | 16,027 | 67.4% | 1.46 | 0.979 (0.968-0.988) | -3,398 | -3,549 | 9 | 1.000 | 1.000 |
+| S2 every price 1.6-2.2 | 52,211 | 50.7% | 1.90 | 0.957 (0.949-0.965) | -22,511 | -22,821 | 14 | 1.000 | 1.000 |
+| S2 every price 2.2-3.5 | 145,294 | 32.6% | 2.94 | 0.940 (0.936-0.943) | -87,476 | -87,637 | 18 | 1.000 | 1.000 |
+| S2 every price 3.5-7 | 106,557 | 21.7% | 4.32 | 0.904 (0.894-0.913) | -102,659 | -102,705 | 38 | 1.000 | 1.000 |
+| S2 every longshot >7 | 13,966 | 8.2% | 10.44 | 0.752 (0.710-0.799) | -34,651 | -34,651 | 77 | 1.000 | 1.000 |
+| S2 home favourites under 1.50 | 11,522 | 75.0% | 1.33 | 0.986 (0.975-0.996) | -1,666 | -1,795 | 7 | 0.996 | 1.000 |
+| S2 draws in close matches | 22,249 | 29.9% | 3.25 | 0.965 (0.944-0.986) | -7,814 | -8,522 | 27 | 1.000 | 1.000 |
+| S3 3-fold accumulators of favourites <1.60 | 6,844 | 35.4% | 2.72 | 0.932 (0.901-0.964) | -4,646 | -4,817 | 19 | 1.000 | 1.000 |
+| S3 5-fold accumulators of favourites <1.60 | 4,011 | 17.5% | 5.31 | 0.883 (0.820-0.945) | -4,690 | -4,858 | 58 | 1.000 | 1.000 |
+| S4 results-only model, value at Bet365 (EV > 0%) | 91,858 | 30.3% | 3.66 | 0.908 (0.898-0.918) | -84,584 | -84,687 | 31 | 1.000 | 1.000 |
+| S4b results-only model, value at BEST price (EV > 20%) | 42,468 | 24.7% | 4.67 | 0.964 (0.947-0.982) | -15,144 | -15,560 | 28 | 1.000 | 1.000 |
+| S5 model + market, value at Bet365 (EV > 5%) | 1,597 | 31.6% | 3.70 | 0.966 (0.889-1.044) | -546 | -1,159 | 17 | 0.812 | 1.000 |
+| S5b model + market, value at BEST price (EV > 20%) | 708 | 25.1% | 5.70 | 1.164 (0.996-1.347) | +1,158 | -454 | 24 | 0.037 | 0.441 |
+| S7 BEST price beats Bet365 fair price (EV > 10%) | 5,197 | 18.3% | 6.66 | 1.038 (0.979-1.096) | +1,966 | -1,387 | 30 | 0.110 | 0.882 |
+| S6 goals model, over/under at Bet365 (EV > 20%) | 2,563 | 30.8% | 2.98 | 0.876 (0.822-0.930) | -3,178 | -3,361 | 23 | 1.000 | 1.000 |
+| S6b goals model + market, over/under at Bet365 (EV > 5%) | 10 | 20.0% | 2.39 | 0.524 (0.000-1.302) | -48 | -53 | 5 | 0.923 | 1.000 |
+| S6c goals model + market, over/under at BEST price (EV > 5%) | 501 | 49.7% | 2.90 | 1.000 (0.909-1.090) | -2 | -268 | 8 | 0.504 | 1.000 |
+| S7b BEST over/under price beats Bet365 fair price (EV > 3%) | 1,076 | 36.0% | 3.46 | 0.956 (0.885-1.031) | -476 | -746 | 15 | 0.877 | 1.000 |
+| S8 BEST price beats Bet365 fair, short prices only (EV > 5%, price <= 2.5) | 832 | 54.0% | 2.11 | 1.121 (1.053-1.192) | +1,004 | -178 | 6 | 0.000 | 0.007 |
+
+## Sensitivity: the same TEST bets if your bookmaker pays 3% less than these prices (a wider margin, as on many African betting sites)
+
+| strategy | back per GH₵1 at these prices | at 3% worse prices |
+|---|---|---|
+| S1 every home at Bet365 | 0.940 | 0.912 |
+| S1 every draw at Bet365 | 0.934 | 0.906 |
+| S1 every away at Bet365 | 0.903 | 0.876 |
+| S2 every favourite | 0.955 | 0.926 |
+| S2 every price 1-1.3 | 0.991 | 0.961 |
+| S2 every price 1.3-1.6 | 0.979 | 0.949 |
+| S2 every price 1.6-2.2 | 0.957 | 0.928 |
+| S2 every price 2.2-3.5 | 0.940 | 0.912 |
+| S2 every price 3.5-7 | 0.904 | 0.877 |
+| S2 every longshot >7 | 0.752 | 0.729 |
+| S2 home favourites under 1.50 | 0.986 | 0.956 |
+| S2 draws in close matches | 0.965 | 0.936 |
+| S3 3-fold accumulators of favourites <1.60 | 0.932 | 0.904 |
+| S3 5-fold accumulators of favourites <1.60 | 0.883 | 0.857 |
+| S4 results-only model, value at Bet365 (EV > 0%) | 0.908 | 0.881 |
+| S4b results-only model, value at BEST price (EV > 20%) | 0.964 | 0.935 |
+| S5 model + market, value at Bet365 (EV > 5%) | 0.966 | 0.937 |
+| S5b model + market, value at BEST price (EV > 20%) | 1.164 | 1.129 |
+| S7 BEST price beats Bet365 fair price (EV > 10%) | 1.038 | 1.007 |
+| S6 goals model, over/under at Bet365 (EV > 20%) | 0.876 | 0.850 |
+| S6b goals model + market, over/under at Bet365 (EV > 5%) | 0.524 | 0.508 |
+| S6c goals model + market, over/under at BEST price (EV > 5%) | 1.000 | 0.970 |
+| S7b BEST over/under price beats Bet365 fair price (EV > 3%) | 0.956 | 0.927 |
+| S8 BEST price beats Bet365 fair, short prices only (EV > 5%, price <= 2.5) | 1.121 | 1.087 |
+
+## Positive control: a planted edge must be found
+
+- planted world, true probability = 90% market + 10% rating model: S5 at Bet365 returns 1.009 per GH₵1 (0.935-1.086) on 3,173 bets, p = 0.4041 -> missed
+- planted world, true probability = 80% market + 20% rating model: S5 at Bet365 returns 1.062 per GH₵1 (1.022-1.102) on 10,284 bets, p = 0.0013 -> FOUND
+- planted world, true probability = 70% market + 30% rating model: S5 at Bet365 returns 1.230 per GH₵1 (1.157-1.310) on 3,513 bets, p = 0.0000 -> FOUND
+
+## Leakage check: results from 2020 on replaced by random results
+
+  ratings built in 3s
+  models fitted in 33s
+largest change in any forecast made before 2020: 0.00e+00 -> no leakage
+
+## Forward-test plan for S8 (paper bets logged before kick-off)
+
+- to confirm a true return of 1.05 (1% false alarm, 90% power): about 5,785 bets (the historical rule found about 82 a year in these 38 leagues)
+- to confirm a true return of 1.08 (1% false alarm, 90% power): about 2,260 bets (the historical rule found about 82 a year in these 38 leagues)
+- to confirm a true return of 1.12 (1% false alarm, 90% power): about 1,005 bets (the historical rule found about 82 a year in these 38 leagues)
+- faster check: 'closing-line value' - the price you got vs the fair price at kick-off; positive on average over 150-200 bets is the standard early sign that the edge is real and you can actually get it
+
+Done in 163s. Full TEST table: sports_lab_results.csv
+
+
+
+

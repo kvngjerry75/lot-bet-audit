@@ -1,0 +1,9 @@
+PASS  test_afriluck_loader
+PASS  test_payout_maths
+PASS  test_bet_lab_positive_control
+PASS  test_bet_lab_negative_control
+PASS  test_detectors_find_planted_effects
+PASS  test_forward_test_late_flag
+PASS  test_no_future_leakage
+
+ALL AUDIT TESTS PASSED

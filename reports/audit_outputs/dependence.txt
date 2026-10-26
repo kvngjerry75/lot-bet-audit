@@ -1,0 +1,55 @@
+# Dependence lab: Afriluck, 2061 draws (2024-06-29 to 2026-10-26)
+
+Fitted machine: pink balls x1.112 exit strength vs yellow; strongest ball 16 (x1.197), weakest 36 (x0.793)
+
+## A. Do balls come out together? (real vs 300 simulated histories of the fitted machine)
+
+| statistic | real | simulated mean (sd) | p (two-sided unless noted) | reading |
+|---|---|---|---|---|
+| pair dispersion | 1395.91 | 1581.21 (67.60) | 0.006 | LESS than chance |
+| most over-represented pair (z) | 2.89 | 3.74 (0.43) | 1.000 (upper) | as chance |
+| neighbour pairs |a-b|=1 | 1085.00 | 1084.65 (31.50) | 0.944 | as chance |
+| close pairs |a-b|<=2 | 2098.00 | 2152.32 (41.14) | 0.213 | as chance |
+| same-decade pairs | 4654.00 | 4802.46 (62.72) | 0.027 | LESS than chance |
+| spread of pink count | 1.36 | 1.36 (0.04) | 0.877 | as chance |
+
+Planted control (15 pairs lifted x1.77 in 40 fake histories): found by 'pair dispersion' 78%, by 'most over-represented pair' 100% of the time.
+So if any pairs had the lift Perm-2 needs, these tests would show it.
+
+## B. Did the balls or the bias change at some date? (real vs 300 shuffles of the draw order)
+
+| statistic | real | shuffled mean | p |
+|---|---|---|---|
+| pink CUSUM | 1.02 | 0.83 | 0.183 |
+| best single split (57 balls) | 70.59 | 68.96 | 0.352 |
+| ball x period table | 340.79 | 356.61 | 0.724 |
+
+Planted ball-set change (20 balls x1.25 / x0.8 from mid-history) found: pink CUSUM 10%, best single split (57 balls) 92%, ball x period table 60%
+Planted colour change (pink 1.00 -> 1.22 mid-history) found: pink CUSUM 100%, best single split (57 balls) 45%, ball x period table 15%
+Pink per draw by sixth of the history: Jun 24 3.12, Jan 25 3.13, May 25 3.14, Sep 25 3.02, Feb 26 3.08, Jun 26 3.11
+
+## C. Machine numbers (489 draws with machine numbers, 2025-12-09 to 2026-10-26)
+
+- Pink machine numbers: 1302 (2.66 per draw). If they were simply exits 7-12 of the same machine: 1507 (z = -8.1, p = 3.7e-16). If picked evenly from the leftover balls: 1433.
+- All 12 balls together are 47.9% pink (a fair machine: 49.1%). So the machine takes out about a fair 12; the pink ones simply tend to come out FIRST (winning numbers), the yellow ones later (machine numbers).
+- Pink share by exit position 1-12: 0.48 0.54 0.53 0.54 0.50 0.51 0.48 0.46 0.48 0.44 0.39 0.41
+- Within each colour, a ball's winning rate vs its machine-number rate: r = -0.422 (null of a fair 12 with pink first and NO per-ball effect: mean -0.018, p = 0.005). Negative = balls that win more come out LESS as machine numbers: each ball has its own 'comes out early' tendency.
+- Money: tested walk-forward (an 'early ball' model using the machine numbers), it did NOT beat sharp (see the audit report), and machine-number Perm-2 at 20x returns about 22p per GH₵1.
+
+## All tests, corrected for multiple testing (Benjamini-Hochberg)
+
+| test | p | BH q | survives |
+|---|---|---|---|
+| A pair dispersion | 0.0061 | 0.022 | yes |
+| A most over-represented pair (z) | 1 | 1 | no |
+| A neighbour pairs |a-b|=1 | 0.94 | 1 | no |
+| A close pairs |a-b|<=2 | 0.21 | 0.39 | no |
+| A same-decade pairs | 0.027 | 0.073 | no |
+| A spread of pink count | 0.88 | 1 | no |
+| B pink CUSUM | 0.18 | 0.39 | no |
+| B best single split (57 balls) | 0.35 | 0.55 | no |
+| B ball x period table | 0.72 | 1 | no |
+| C machine numbers = exits 7-12 of the same machine | 3.7e-16 | 4e-15 | yes |
+| C winning vs machine rate per ball | 0.0045 | 0.022 | yes |
+
+Done in 5s. None of these effects moves a pair's odds anywhere near the x1.77 Perm-2 needs.

@@ -1,0 +1,15 @@
+PASS  test_miner_uses_only_past_draws
+PASS  test_miner_quiet_on_fair_machine
+PASS  test_miner_finds_planted_rule
+| game | rows in | removed | rows out | kept rows on a shared date |
+|---|---|---|---|---|
+| G | 4 | 2 | 2 | 0 |
+| H | 1 | 0 | 1 | 0 |
+
+  G         2024-01-01  11 12 13 14 50        number outside the pool 1..39
+  G         2024-01-03  1 2 3 4 5             copy of the draw of 2024-01-02 (same numbers, same order)
+PASS  test_clean_data_removes_copies
+PASS  test_full_layout_scores_everything
+PASS  test_tracker_same_day_not_counted
+
+ALL V3 TESTS PASSED

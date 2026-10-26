@@ -1,0 +1,12 @@
+# DayWA: TUNE draws 300-1325, TEST draws 1326-2075 (2024-08-10 to 2026-10-24); chance 2+ in 10-core = 38.1%
+
+| pipeline | TUNE 2+ in core | TEST 2+ in core | TEST 3+ | TEST hits in top k | TEST ticket 2+ of k | TEST log-score gain |
+|---|---|---|---|---|---|---|
+| chance | 37.5% | 40.3% | 9.5% | 0.651 | 12.7% | +0.00000 |
+| CURRENT: sharp-style (halves, BMA of 16) | 38.8% | 40.1% | 10.8% | 0.661 | 12.1% | +0.00158 |
+| best on TUNE by hit rate [thirds, pull None, hl None] | 40.5% | 38.1% | 9.7% | 0.640 | 11.1% | +0.00092 |
+| best on TUNE by log-score [odd/even, pull None, hl None] | 37.0% | 35.3% | 11.5% | 0.637 | 12.4% | -0.00029 |
+| BMA of every candidate | 36.5% | 39.1% | 12.3% | 0.636 | 11.5% | +0.00066 |
+| BMA of TUNE top-5 by log-score | 36.6% | 40.0% | 10.5% | 0.673 | 11.9% | +0.00001 |
+
+124 candidates searched. If no tuned row beats the CURRENT row on TEST, extra tuning only fits noise.

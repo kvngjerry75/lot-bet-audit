@@ -1,0 +1,13 @@
+# Forward-test plan (pre-registered): H0 = 0.62 back per GH₵1 (pink bias only), H1 = 1.00 (break-even)
+One-sided 1% false alarm, 90% power. sd = spread of one draw's return per GH₵1 for a pink-first pick.
+
+| bet | GH₵ per draw | expected back now | sd per draw | draws needed | about |
+|---|---|---|---|---|---|
+| Perm-2 on top 3 (3 pairs) | 3 | 0.62 | 3.77 | 1279 | 64 weeks at 20 draws a week |
+| Perm-2 on top 6 (15 pairs) | 15 | 0.62 | 1.92 | 332 | 17 weeks at 20 draws a week |
+| Perm-2 on top 10 (45 pairs) | 45 | 0.62 | 1.25 | 141 | 7 weeks at 20 draws a week |
+| Banker on top ball (56 lines) | 56 | 0.59 | 1.68 | 255 | 13 weeks at 20 draws a week |
+| Direct-1 (first ball) on top ball | 1 | 0.56 | 4.05 | 1480 | 74 weeks at 20 draws a week |
+| Direct-3 on top 3 | 1 | 0.52 | 17.72 | 28292 | 1415 weeks at 20 draws a week |
+
+For comparison, just showing the pink edge itself (0.62 vs 0.564 for a random pick, 5% / 80%) takes about 3,076 draws of Perm-2 on 10: that is why it took the whole history to prove it.

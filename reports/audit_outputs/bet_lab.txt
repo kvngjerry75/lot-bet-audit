@@ -1,0 +1,98 @@
+# Bet lab: Afriluck, 1761 draws bet walk-forward (2024-12-29 to 2026-10-26); GH₵1 per line
+
+## 1. The ceiling: pink strength w = 1.112 (95% CI 1.073-1.152) per exit, yellow = 1
+
+| bet | fair machine | if the pink bias were known exactly | at the top of its 95% CI | needs to break even |
+|---|---|---|---|---|
+| perm2 | 0.564 | 0.624 | 0.645 | pair x1.77 |
+| direct1 | 0.526 | 0.554 | 0.564 | first ball x1.90 |
+| banker | 0.564 | 0.593 | 0.602 | ball x1.77 |
+| direct3 | 0.410 | 0.479 | 0.504 | triple x2.44 |
+| direct4 | 0.380 | 0.469 | 0.502 | four x2.63 |
+
+Every number in the 'known exactly' column is below 1.000: with colour as the only edge, every bet loses.
+
+## 2. Walk-forward returns of every forecaster x bet
+
+### 62 forecaster x bet rows; BH q = false-discovery-adjusted p for 'beats break-even'
+
+| forecaster | bet | staked per draw | back per GH₵1 (95% CI) | net GH₵ | deepest fall | longest losing run | beats luck | p(beats break-even) | BH q |
+|---|---|---|---|---|---|---|---|---|---|
+| MAIN BEAST | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.670 (0.500-0.852) | -1,743 | -1,845 | 221 | 87.5% | 1.000 | 1.000 |
+| MAIN BEAST | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.670 (0.545-0.806) | -3,486 | -3,636 | 78 | 94.4% | 1.000 | 1.000 |
+| MAIN BEAST | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.661 (0.552-0.780) | -5,970 | -6,110 | 78 | 96.5% | 1.000 | 1.000 |
+| MAIN BEAST | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.643 (0.557-0.734) | -9,435 | -9,525 | 36 | 95.9% | 1.000 | 1.000 |
+| MAIN BEAST | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.656 (0.588-0.726) | -16,968 | -17,128 | 31 | 99.3% | 1.000 | 1.000 |
+| MAIN BEAST | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.644 (0.584-0.697) | -28,245 | -28,695 | 20 | 99.8% | 1.000 | 1.000 |
+| MAIN BEAST | Direct-1 (first ball) on top ball | GH₵1 | 0.647 (0.459-0.885) | -621 | -638 | 213 | 89.0% | 0.999 | 1.000 |
+| MAIN BEAST | Banker on top ball (56 lines) | GH₵56 | 0.599 (0.529-0.663) | -39,516 | -40,140 | 59 | 82.1% | 1.000 | 1.000 |
+| MAIN BEAST | Direct-3 on top 3 | GH₵1 | 0.681 (0.083-2.458) | -561 | -849 | 799 | 65.2% | 0.791 | 1.000 |
+| MAIN BEAST | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.647 (0.443-0.852) | -1,863 | -1,980 | 183 | 81.8% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.579 (0.443-0.693) | -4,446 | -4,752 | 96 | 54.4% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.545 (0.433-0.624) | -8,010 | -8,490 | 54 | 33.2% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.534 (0.450-0.593) | -12,315 | -12,825 | 48 | 23.3% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.565 (0.499-0.621) | -21,468 | -21,984 | 28 | 49.8% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.537 (0.482-0.582) | -36,705 | -37,065 | 19 | 16.1% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Direct-1 (first ball) on top ball | GH₵1 | 0.596 (0.416-0.826) | -711 | -771 | 228 | 75.1% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Banker on top ball (56 lines) | GH₵56 | 0.584 (0.505-0.654) | -41,016 | -41,584 | 36 | 69.1% | 1.000 | 1.000 |
+| stage4 ORIGINAL ensemble | Direct-3 on top 3 | GH₵1 | 1.022 (0.211-2.982) | +39 | -618 | 618 | 87.1% | 0.562 | 1.000 |
+| stage4 ORIGINAL ensemble | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.500 (0.352-0.659) | -2,643 | -2,706 | 188 | 20.9% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.562 (0.466-0.670) | -4,626 | -4,746 | 93 | 45.3% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.552 (0.467-0.644) | -7,890 | -7,960 | 49 | 37.8% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.559 (0.486-0.645) | -11,655 | -11,670 | 41 | 42.1% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.565 (0.495-0.633) | -21,468 | -21,616 | 31 | 49.8% | 1.000 | 1.000 |
+| stage5 forecaster | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.572 (0.507-0.626) | -33,945 | -34,380 | 31 | 58.3% | 1.000 | 1.000 |
+| stage5 forecaster | Direct-1 (first ball) on top ball | GH₵1 | 0.409 (0.263-0.606) | -1,041 | -1,093 | 321 | 9.1% | 1.000 | 1.000 |
+| stage5 forecaster | Banker on top ball (56 lines) | GH₵56 | 0.557 (0.474-0.639) | -43,716 | -44,324 | 62 | 40.1% | 1.000 | 1.000 |
+| stage5 forecaster | Direct-3 on top 3 | GH₵1 | 0.341 (0.009-1.896) | -1,161 | -1,665 | 1665 | 29.5% | 0.947 | 1.000 |
+| stage5 forecaster | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.670 (0.488-0.863) | -1,743 | -1,845 | 221 | 87.5% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.670 (0.539-0.806) | -3,486 | -3,636 | 78 | 94.4% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.661 (0.549-0.780) | -5,970 | -6,110 | 78 | 96.5% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.643 (0.559-0.734) | -9,435 | -9,525 | 36 | 95.9% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.656 (0.591-0.723) | -16,968 | -17,128 | 31 | 99.3% | 1.000 | 1.000 |
+| sharp | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.644 (0.581-0.697) | -28,245 | -28,695 | 20 | 99.8% | 1.000 | 1.000 |
+| sharp | Direct-1 (first ball) on top ball | GH₵1 | 0.647 (0.459-0.885) | -621 | -638 | 213 | 89.0% | 0.999 | 1.000 |
+| sharp | Banker on top ball (56 lines) | GH₵56 | 0.599 (0.523-0.666) | -39,516 | -40,140 | 59 | 82.1% | 1.000 | 1.000 |
+| sharp | Direct-3 on top 3 | GH₵1 | 0.681 (0.083-2.458) | -561 | -849 | 799 | 65.2% | 0.791 | 1.000 |
+| sharp | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| colour only | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.716 (0.545-0.897) | -1,503 | -1,581 | 117 | 95.2% | 0.999 | 1.000 |
+| colour only | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.659 (0.528-0.795) | -3,606 | -3,936 | 100 | 92.5% | 1.000 | 1.000 |
+| colour only | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.695 (0.589-0.811) | -5,370 | -5,610 | 100 | 99.6% | 1.000 | 1.000 |
+| colour only | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.716 (0.613-0.815) | -7,515 | -7,725 | 43 | 99.9% | 1.000 | 1.000 |
+| colour only | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.663 (0.596-0.731) | -16,608 | -16,788 | 23 | 99.8% | 1.000 | 1.000 |
+| colour only | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.650 (0.596-0.704) | -27,705 | -27,840 | 18 | 99.9% | 1.000 | 1.000 |
+| colour only | Direct-1 (first ball) on top ball | GH₵1 | 0.494 (0.332-0.707) | -891 | -943 | 277 | 32.7% | 1.000 | 1.000 |
+| colour only | Banker on top ball (56 lines) | GH₵56 | 0.560 (0.481-0.642) | -43,416 | -44,080 | 64 | 42.8% | 1.000 | 1.000 |
+| colour only | Direct-3 on top 3 | GH₵1 | 0.000 (0.000-1.256) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| colour only | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 3 (3 pairs) | GH₵3 | 0.738 (0.545-0.965) | -1,383 | -1,458 | 116 | 97.2% | 0.994 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 4 (6 pairs) | GH₵6 | 0.733 (0.608-0.875) | -2,826 | -2,940 | 69 | 99.6% | 1.000 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 5 (10 pairs) | GH₵10 | 0.746 (0.641-0.848) | -4,470 | -4,520 | 49 | 99.9% | 1.000 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 6 (15 pairs) | GH₵15 | 0.786 (0.695-0.888) | -5,655 | -5,730 | 30 | 100.0% | 1.000 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 8 (28 pairs) | GH₵28 | 0.762 (0.692-0.842) | -11,748 | -11,784 | 21 | 100.0% | 1.000 | 1.000 |
+| ORACLE (cheats) | Perm-2 on top 10 (45 pairs) | GH₵45 | 0.729 (0.670-0.800) | -21,465 | -21,480 | 14 | 100.0% | 1.000 | 1.000 |
+| ORACLE (cheats) | Direct-1 (first ball) on top ball | GH₵1 | 0.630 (0.445-0.865) | -651 | -666 | 182 | 84.6% | 0.999 | 1.000 |
+| ORACLE (cheats) | Banker on top ball (56 lines) | GH₵56 | 0.700 (0.611-0.779) | -29,616 | -30,940 | 56 | 99.9% | 1.000 | 1.000 |
+| ORACLE (cheats) | Direct-3 on top 3 | GH₵1 | 1.022 (0.211-2.982) | +39 | -1,018 | 1018 | 87.1% | 0.562 | 1.000 |
+| ORACLE (cheats) | Direct-4 on top 4 | GH₵1 | 0.000 (0.000-20.926) | -1,761 | -1,761 | 1761 | 0.0% | 1.000 | 1.000 |
+| machine model | Machine-number Perm-2 on top 6 (15 pairs) [462 draws] | GH₵15 | 0.214 (0.165-0.277) | -5,450 | -5,450 | 40 | 80.0% | 1.000 | 1.000 |
+| machine model | Machine-number Perm-2 on top 10 (45 pairs) [462 draws] | GH₵45 | 0.222 (0.194-0.266) | -16,170 | -16,170 | 58 | 96.6% | 1.000 | 1.000 |
+
+## 3. Verdict
+
+NO forecaster x bet combination beats break-even after the multiple-testing correction.
+Rows above 100% that rest on a handful of wins (luck, as their p-values show): stage4 ORIGINAL ensemble direct3 (3 wins)
+Highest realised returns among bets with 30+ wins (picked AFTER the fact, so expect less in future):
+- colour only, Perm-2 on top 3 (3 pairs): 71.6% back -> about GH₵28 lost per GH₵100 staked
+- colour only, Perm-2 on top 6 (15 pairs): 71.6% back -> about GH₵28 lost per GH₵100 staked
+- colour only, Perm-2 on top 5 (10 pairs): 69.5% back -> about GH₵30 lost per GH₵100 staked
+Expected in future (the ceiling above): Perm-2 on pink balls ~62% back, i.e. about GH₵38 lost per GH₵100. Not playing loses nothing.
+
+## 4. Fair-machine controls (200 unbiased histories through sharp, Perm-2 on top 10)
+
+sharp on the real machine: 0.644 back; on fair machines: mean 0.565, p = 0.005 (share of fair machines doing at least as well)
+
+Full table: bet_lab_table.csv

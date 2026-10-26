@@ -1,0 +1,17 @@
+Afriluck: 2061 draws. Pink balls per draw: 3.100 (fair machine 2.947)
+
+1. Direct checks
+   Anopa   : 3.052 pink per draw over 651 draws
+   Midday  : 3.135 pink per draw over 577 draws
+   evening : 3.113 pink per draw over 833 draws
+   by weekday: Mon: 3.18, Tue: 3.07, Wed: 3.05, Thu: 3.06, Fri: 3.15, Sat: 3.12, Sun: 3.05
+   do pink-heavy draws come in runs? lag-1 correlation +0.004 (constant-edge fakes -0.000, p 0.421)
+   do some DAYS run much pinker than others? day-to-day variance 0.700 (fakes 0.676, p 0.244)
+   (pink ball edge estimated at x1.107 per ball vs yellow)
+
+2. Timing model (stake only on the 30% of draws it rates highest)
+   real draws: 2+ in core on stake days 30.9% (499 draws) vs every draw 30.6% (1661 draws): gain +0.2 points
+   Perm-2 back: stake days 65% vs every draw 64%
+   constant-edge fakes (no timing signal by construction): average gain -0.5 points; p (fakes >= real) 0.373; Perm-2 gain on fakes -1.1 points
+
+VERDICT: no timing signal: the pink edge is the same on every draw, so the best 'when' is any draw you choose to play - timing adds nothing.

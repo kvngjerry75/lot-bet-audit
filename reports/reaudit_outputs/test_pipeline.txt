@@ -1,0 +1,26 @@
+PASS  test_anchor_always_on_forecasts_every_block
+PASS  test_anchor_no_future_and_turnover_cap
+PASS  test_banned_columns_rejected
+PASS  test_chance_maths
+PASS  test_consensus_top2_needs_every_heavy_expert
+PASS  test_determinism_no_hidden_randomness
+PASS  test_experts_do_not_see_the_future
+PASS  test_leakage_20_random_t
+PASS  test_leakage_test_is_sensitive
+PASS  test_permutation_null_keeps_draw_structure
+/usr/local/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (5) reached and the optimization hasn't converged yet.
+  warnings.warn(
+/usr/local/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (5) reached and the optimization hasn't converged yet.
+  warnings.warn(
+/usr/local/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:785: ConvergenceWarning: Stochastic Optimizer: Maximum iterations (5) reached and the optimization hasn't converged yet.
+  warnings.warn(
+PASS  test_pointwise_experts_run_and_gate
+PASS  test_pool_size_generality
+PASS  test_rulemem_expert_uses_only_past_draws
+SKIP  test_tft_army_runs_and_silences_unskilled_members (torch not installed)
+SKIP  test_tft_zero_init_is_uniform (torch not installed)
+PASS  test_track_record_rule_blocks_silent_expert
+PASS  test_tracker_logs_once_and_flags_late
+PASS  test_wheel_guarantee
+
+ALL TESTS PASSED

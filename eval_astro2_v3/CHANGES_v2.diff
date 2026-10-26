@@ -1,0 +1,1206 @@
+--- a/anchor.py
++++ b/anchor.py
+@@ -16,6 +16,11 @@
+      (Jaccard) at most `max_top_jaccard`. Stagnation is a hard constraint of the fit, not a hope.
+   4. HONEST GATE: weights are first fitted on the older 2/3 of the window and must show log-loss skill > 0 on the newest 1/3
+      before the expert is active. If the long signal is not real, the gate shuts the expert (uniform) instead of faking it.
++  5. MEASUREMENT MODE (anchor.always_on): the gate and the turnover cap can shut the expert in most walk-forward blocks, so
++     its out-of-sample record is empty and nothing can be measured. With always_on the expert forecasts in EVERY block
++     (backtest and next draw alike): if no grid point meets the cap, the cap is relaxed to the lowest achievable Jaccard
++     + cap_relax. The hold-out skill is still computed and logged, it just no longer switches the expert off.
++     Every fit records `reason` (min_fit | turnover_cap | gate | ok | ok_relaxed_cap | ok_ungated).
+ 
+ The long columns are internal to this expert; they never enter fb.F, the ranker, the TFT or the twin, so the
+ long-history bans in features_recent stay fully intact.
+@@ -89,8 +94,9 @@
+     return float(np.mean(inter / (2 * K - inter)))
+ 
+ 
+-def _select(Zf, Xf, nb, K, ac):
++def _select(Zf, Xf, nb, K, ac, cap=None):
+     """Best (wL, sc) by log-loss under the turnover cap. Returns (w (4,), bce, jaccard) or None."""
++    cap = ac["max_top_jaccard"] if cap is None else cap
+     drawn = Xf.sum()
+     m = np.array([(Zf[:, :, i] * Xf).sum() / max(drawn, 1.0) for i in range(4)])   # mean z of drawn balls (0 = no signal)
+     mf = m[1:]
+@@ -102,7 +108,7 @@
+             w = np.array([sL * wl, sc * fdir[0], sc * fdir[1], sc * fdir[2]])
+             lg = Zf @ w
+             jac = top_jaccard(lg, K)
+-            if jac > ac["max_top_jaccard"]:
++            if jac > cap:
+                 continue
+             b = _bce(_probs(lg, nb), Xf)
+             if best is None or b < best[1]:
+@@ -110,25 +116,50 @@
+     return best
+ 
+ 
++def _min_jaccard(Zf, Xf, K, ac):
++    """Lowest top-K Jaccard any grid point achieves on this window (scaling w does not change the order, so this is
++    a property of the window's signal directions, not of the grid)."""
++    drawn = Xf.sum()
++    m = np.array([(Zf[:, :, i] * Xf).sum() / max(drawn, 1.0) for i in range(4)])
++    fdir = m[1:] / max(np.abs(m[1:]).max(), 1e-9)
++    sL = 1.0 if m[0] >= 0 else -1.0
++    return min(top_jaccard(Zf @ np.array([sL * wl, sc * fdir[0], sc * fdir[1], sc * fdir[2]]), K)
++               for wl in ac["wL_grid"] for sc in ac["fast_grid"])
++
++
++def _select_or_relax(Zf, Xf, nb, K, ac):
++    """(_select result, relaxed?) ; relaxed only in always_on mode when nothing meets the cap."""
++    A = _select(Zf, Xf, nb, K, ac)
++    if A is not None or not ac.get("always_on"):
++        return A, False
++    return _select(Zf, Xf, nb, K, ac, cap=_min_jaccard(Zf, Xf, K, ac) + ac.get("cap_relax", 0.05)), True
++
++
+ def fit_anchor(Z, X, a, cfg):
+-    """Fit on draws [a - fit_len, a). Returns dict(w, active, skill, jaccard, wL)."""
++    """Fit on draws [a - fit_len, a). Returns dict(w, active, skill, jaccard, wL, reason).
++    The SAME function is used for every walk-forward block and for the next draw, so the two can only differ through
++    the data in the window, never through the code path."""
+     ac = cfg["anchor"]
+     nb = X.shape[1]
+     K = core_size(cfg, nb)
+     lo = max(ac["warmup"], a - ac["fit_len"])
+-    dead = dict(w=np.zeros(4), active=False, skill=0.0, jaccard=0.0, wL=0.0)
++    dead = dict(w=np.zeros(4), active=False, skill=0.0, jaccard=0.0, wL=0.0, reason="min_fit")
+     if a - lo < ac["min_fit"]:
+         return dead
+     cut = lo + int(round((a - lo) * 2 / 3))
+-    A = _select(Z[lo:cut], X[lo:cut], nb, K, ac)
++    A, relaxed = _select_or_relax(Z[lo:cut], X[lo:cut], nb, K, ac)
+     if A is None:
++        dead["reason"] = "turnover_cap"
++        dead["jaccard"] = _min_jaccard(Z[lo:cut], X[lo:cut], K, ac)
+         return dead
+     skill = 1.0 - _bce(_probs(Z[cut:a] @ A[0], nb), X[cut:a]) / uniform_bce(nb)    # honest hold-out: newest third
+-    if skill <= ac["gate_margin"]:
+-        dead["skill"] = skill
++    if skill <= ac["gate_margin"] and not ac.get("always_on"):
++        dead.update(skill=skill, reason="gate")
+         return dead
+-    F = _select(Z[lo:a], X[lo:a], nb, K, ac) or A
+-    return dict(w=F[0], active=True, skill=skill, jaccard=F[2], wL=float(F[0][0]))
++    F, relaxed_f = _select_or_relax(Z[lo:a], X[lo:a], nb, K, ac)
++    F = F or A
++    reason = "ok_relaxed_cap" if (relaxed or relaxed_f) else ("ok" if skill > ac["gate_margin"] else "ok_ungated")
++    return dict(w=F[0], active=True, skill=skill, jaccard=F[2], wL=float(F[0][0]), reason=reason)
+ 
+ 
+ def anchor_predict(fit, Z, a, b, nb):
+@@ -138,14 +169,15 @@
+ 
+ 
+ def _row(a, f, final=False):
+-    r = dict(block_start=int(a), active=bool(f["active"]), skill=round(f["skill"], 5), wL=round(f["wL"], 3),
++    r = dict(block_start=int(a), active=bool(f["active"]), reason=f.get("reason", ""), skill=round(f["skill"], 5),
++             wL=round(f["wL"], 3),
+              jaccard=round(f["jaccard"], 3), w=[round(float(x), 3) for x in f["w"]])
+     if final:
+         r["final"] = True
+     return r
+ 
+ 
+-def run_anchor(d, fb, cfg, span_start, n, cad, predict_next=False):
++def run_anchor(d, fb, cfg, span_start, n, cad, predict_next=False, quiet=False):
+     """Walk-forward by blocks. Returns (probs (n-span_start, nb), active (rows,), info list, next=(vec, active) | None)."""
+     nb = d.X.shape[1]
+     X = np.array(d.X, dtype=np.float64)
+@@ -165,4 +197,7 @@
+         f = fit_anchor(Z, X, n, cfg)
+         nxt = (anchor_predict(f, Z, n, n + 1, nb)[0], f["active"])
+         info.append(_row(n, f, True))
++    for r in ([] if quiet else info):
++        log.info("  anchor fit @%d%s: active=%s reason=%s hold-out skill %+.5f top-K Jaccard %.3f w=%s", r["block_start"],
++                 " (NEXT DRAW)" if r.get("final") else "", r["active"], r["reason"], r["skill"], r["jaccard"], r["w"])
+     return out, act, info, nxt
+--- a/eval_harness.py
++++ b/eval_harness.py
+@@ -30,7 +30,7 @@
+ 
+ log = logging.getLogger("nla.eval")
+ 
+-ENSEMBLE_EXPERTS = ("tft_army", "ranker", "hazard", "markov", "anchor")
++ENSEMBLE_EXPERTS = ("tft_army", "ranker", "hazard", "markov", "anchor", "mlp", "booster")
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -89,10 +89,38 @@
+         act = np.array([bool(res["active"][k][a - span_start]) for k in names])
+     else:
+         act = np.array([bool(active_override[k]) for k in names])
++    # Track-record rule (same for every walk-forward block and for the next draw): an expert that was silent (uniform)
++    # on most of the validation window has gain ~0 there, which beats any expert with a slightly negative gain. Without
++    # this rule the hedge hands its largest weight to whichever expert said NOTHING during validation.
++    track = np.array([float(np.mean(res["active"][k][lo - span_start:a - span_start])) for k in names])
++    act = act & (track >= ec.get("min_track_record", 0.0))
++    if ec.get("require_positive_gain"):
++        act = act & (gains > 0)
+     w = mult * h * act
+     return dict(zip(names, w)), dict(zip(names, gains)), dict(zip(names, h))
+ 
+ 
++def consensus_scores(rows, w, vote, share):
++    """Consensus score per ball: the WORST rank it gets from any heavy expert (weight share >= `share`), so a ball only
++    scores high when every heavy expert ranks it high. Ties are broken by the ordinary vote (always < 1 point).
++    rows: {expert: (T, nb) probabilities}; w: {expert: weight}; vote: (T, nb)."""
++    sw = sum(w.values())
++    if sw <= 0:
++        return vote
++    heavy = [k for k, v in w.items() if v / sw >= share] or [max(w, key=w.get)]
++    pts = np.min(np.stack([_rank_points(rows[k]) for k in heavy]), axis=0)
++    v = vote - vote.min(1, keepdims=True)
++    return pts + 0.999 * v / (v.max(1, keepdims=True) + 1e-12)          # rank points are integers: this only breaks ties
++
++
++def top2_metrics(score, X):
++    """Top-2 of each row of `score` against the drawn balls X: mean hits among the 2 and rate of both drawn."""
++    order = np.argsort(-score, axis=1, kind="stable")[:, :2]
++    h = X[np.arange(len(X))[:, None], order].sum(1)
++    return dict(hits=float(h.mean()), both=float((h >= 2).mean()), any=float((h >= 1).mean()), n=int(len(X)),
++                h=h, order=order)
++
++
+ def combine(res, P, cfg, lay):
+     """Ensemble probabilities (for log-loss) and vote scores (for picks) over the evaluation draws."""
+     span, ev, n_eval, cad, vl = lay["span_start"], lay["eval_start"], lay["eval_n"], lay["cad"], lay["val_len"]
+@@ -100,6 +128,8 @@
+     nb = next(iter(res["probs"].values())).shape[1]
+     p_ens = np.empty((n_eval, nb))
+     vote = np.empty((n_eval, nb))
++    cons = np.empty((n_eval, nb))
++    share = cfg["ensemble"].get("consensus_share", 0.25)
+     wlog = []
+     for a in range(ev, ev + n_eval, cad):
+         b = a + cad
+@@ -119,9 +149,11 @@
+                 vote[sl] = pts + 1e-6 * p_ens[sl]            # tie-break by the weighted probability (deterministic)
+             else:
+                 vote[sl] = p_ens[sl]
++        rows = {k: res["probs"][k][a - span:b - span] for k in names}
++        cons[sl] = consensus_scores(rows, w, vote[sl], share) if sw > 0 else vote[sl]
+         wlog.append({"block_start": int(a), "weights": {k: float(v) for k, v in w.items()},
+                      "val_gain": {k: float(v) for k, v in gains.items()}})
+-    return p_ens, vote, wlog
++    return p_ens, vote, wlog, cons
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -184,10 +216,11 @@
+         fb = fr.build_features(d, cfg)
+     res = run_experts(d, fb, cfg, lay["span_start"], n, seed, enabled, lay["cad"], predict_next=predict_next,
+                       device=device, quiet=quiet)
+-    p_ens, vote, wlog = combine(res, d.P, cfg, lay)
++    p_ens, vote, wlog, cons = combine(res, d.P, cfg, lay)
+     Xe = d.X[lay["eval_start"]:n].astype(float)
+     sc, pdraw = compute_metrics(p_ens, vote, Xe, cfg)
+-    return dict(fb=fb, res=res, p_ens=p_ens, vote=vote, wlog=wlog, scalars=sc, pdraw=pdraw, Xe=Xe)
++    top2 = {"vote": top2_metrics(vote, Xe), "consensus": top2_metrics(cons, Xe)}
++    return dict(fb=fb, res=res, p_ens=p_ens, vote=vote, cons=cons, wlog=wlog, scalars=sc, pdraw=pdraw, Xe=Xe, top2=top2)
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -205,7 +238,8 @@
+ 
+ def _fingerprint(d, cfg, lay, enabled, seed, metrics):
+     c = copy.deepcopy(cfg)
+-    c["eval"].pop("null_reps", None)
++    for k in ("null_reps", "early_stop_h", "early_stop_min"):              # these change how many, not which replicates
++        c["eval"].pop(k, None)
+     blob = json.dumps(c, sort_keys=True, default=str)
+     return dict(cfg=hashlib.md5(blob.encode()).hexdigest(), n=int(d.n), seed=int(seed), metrics=list(metrics),
+                 data=int(np.asarray(d.P[:d.n]).sum()), lay={k: int(v) for k, v in lay.items()}, enabled=list(enabled))
+@@ -217,36 +251,126 @@
+     os.replace(tmp, path)
+ 
+ 
+-def null_test(d, cfg, lay, enabled, device, reps, seed, observed, progress_every=5, ckpt=None):
+-    """Replicate r permutes the labels with seed + 10000 + r. With `ckpt`, finished replicates are saved after every
+-    replicate and a restarted run resumes (the checkpoint is ignored if data, config or layout changed)."""
++def _null_replicate(d, cfg, lay, enabled, device, seed, r, metrics):
++    """One null replicate. Depends only on (seed, r), so serial and parallel runs compute the same replicate."""
++    rng = np.random.default_rng(seed + 10_000 + r)
++    d2 = permute_within_draws(d, rng)
++    out = evaluate_pipeline(d2, cfg, lay, seed + 10_000 + r, enabled, device, quiet=True)
++    return [float(out["scalars"][m]) for m in metrics]
++
++
++_W = {}
++
++
++def _worker_init(d, cfg, lay, enabled, device, seed, metrics, threads):
++    """Pool worker: limit every library to `threads` CPU threads so N workers do not fight over the same cores."""
++    for v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
++        os.environ[v] = str(threads)
++    try:                                                                 # numpy/BLAS is already loaded: env vars are too late
++        from threadpoolctl import threadpool_limits
++        _W["tp"] = threadpool_limits(threads)
++    except ImportError:
++        pass
++    try:
++        import torch
++        torch.set_num_threads(threads)
++        torch.set_num_interop_threads(1)
++    except (ImportError, RuntimeError):
++        pass
++    fr.make_deterministic()
++    cfg = copy.deepcopy(cfg)
++    cfg["ranker"]["params"]["n_jobs"] = threads
++    cfg["booster"]["params"]["n_jobs"] = threads
++    logging.getLogger().setLevel(logging.WARNING)                        # replicates are quiet; the parent logs progress
++    _W.update(d=d, cfg=cfg, lay=lay, enabled=enabled, device=device, seed=seed, metrics=metrics)
++
++
++def _worker_run(r):
++    w = _W
++    return r, _null_replicate(w["d"], w["cfg"], w["lay"], w["enabled"], w["device"], w["seed"], r, w["metrics"])
++
++
++def null_test(d, cfg, lay, enabled, device, reps, seed, observed, progress_every=5, ckpt=None, workers=1):
++    """Replicate r permutes the labels with seed + 10000 + r. With `ckpt`, finished replicates are saved as they finish
++    and a restarted run resumes (the checkpoint is ignored if data, config or layout changed). workers > 1 runs the
++    replicates in parallel processes (they share the GPU when there is one; the TFT is small, so 2-3 processes fit on a
++    T4 and overlap its CPU-bound ranker work with GPU work); the replicates and their seeds are identical to a serial run."""
+     metrics = list(cfg["eval"]["metrics"])
+     fp = _fingerprint(d, cfg, lay, enabled, seed, metrics)
+-    rows = []
++    done_rows = {}
+     if ckpt is not None and Path(ckpt).exists():
+         try:
+             j = json.loads(Path(ckpt).read_text())
+             if j.get("fp") == fp:
+-                rows = j["rows"][:reps]
+-                log.info("  null test: RESUMING from checkpoint, %d of %d replicates already done", len(rows), reps)
++                if "by_rep" in j:
++                    done_rows = {int(k): v for k, v in j["by_rep"].items() if int(k) < reps}
++                else:                                                    # old checkpoint format: replicates 0..len-1
++                    done_rows = dict(enumerate(j["rows"][:reps]))
++                log.info("  null test: RESUMING from checkpoint, %d of %d replicates already done", len(done_rows), reps)
+             else:
+                 log.warning("  null test: checkpoint %s belongs to a different data/config/layout; starting fresh", ckpt)
+         except (ValueError, KeyError):
+             log.warning("  null test: unreadable checkpoint %s; starting fresh", ckpt)
++    todo = [r for r in range(reps) if r not in done_rows]
+     t0 = time.time()
+-    start = len(rows)
+-    for r in range(start, reps):
+-        rng = np.random.default_rng(seed + 10_000 + r)
+-        d2 = permute_within_draws(d, rng)
+-        out = evaluate_pipeline(d2, cfg, lay, seed + 10_000 + r, enabled, device, quiet=True)
+-        rows.append([float(out["scalars"][m]) for m in metrics])
++    n_new = 0
++    ec = cfg["eval"]
++    h_stop, min_stop = int(ec.get("early_stop_h", 0)), int(ec.get("early_stop_min", 20))
++    obs_vec = np.array([observed[m] for m in metrics])
++
++    def exceedances(rows_):
++        """Null replicates whose max-T statistic is at least the observed one (scales from the replicates so far)."""
++        N_ = np.array(rows_)
++        mu_, sd_ = N_.mean(0), N_.std(0, ddof=1)
++        sd_ = np.where(sd_ > 0, sd_, 1.0)
++        return int((((N_ - mu_) / sd_).max(1) >= ((obs_vec - mu_) / sd_).max()).sum())
++
++    def should_stop():
++        """Besag-Clifford sequential Monte Carlo test: once h replicates beat the observed result the p-value is
++        already >= h / r, far above any threshold that could matter, so further replicates cannot change the verdict."""
++        return h_stop > 0 and len(done_rows) >= min_stop and exceedances(list(done_rows.values())) >= h_stop
++
++    def record(r, row):
++        nonlocal n_new
++        done_rows[r] = row
++        n_new += 1
+         if ckpt is not None:
+-            _atomic_json(Path(ckpt), dict(fp=fp, rows=rows))
+-        done = r + 1 - start
+-        if (r + 1) % progress_every == 0 or r + 1 == reps:
++            _atomic_json(Path(ckpt), dict(fp=fp, by_rep={str(k): v for k, v in sorted(done_rows.items())}))
++        if n_new % progress_every == 0 or len(done_rows) == reps:
+             el = time.time() - t0
+-            log.info("  null replicate %d/%d | %.0fs this session | ~%.0fs left", r + 1, reps, el,
+-                     el / done * (reps - r - 1))
++            log.info("  null replicate %d/%d | %.0fs this session | ~%.0fs left", len(done_rows), reps, el,
++                     el / n_new * (reps - len(done_rows)))
++
++    workers = max(1, min(int(workers), len(todo) or 1))
++    stopped = should_stop()
++    if workers == 1:
++        for r in todo:
++            if stopped:
++                break
++            record(r, _null_replicate(d, cfg, lay, enabled, device, seed, r, metrics))
++            stopped = should_stop()
++    else:
++        import multiprocessing as mp
++        from concurrent.futures import ProcessPoolExecutor, as_completed
++        threads = max(1, (os.cpu_count() or workers) // workers)
++        log.info("  null test: %d replicates to run on %d parallel workers x %d CPU threads", len(todo), workers, threads)
++        with ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn"), initializer=_worker_init,
++                                 initargs=(d, cfg, lay, enabled, device, seed, metrics, threads)) as ex:
++            futs = [] if stopped else [ex.submit(_worker_run, r) for r in todo]
++            for f in as_completed(futs):
++                if f.cancelled():
++                    continue
++                record(*f.result())
++                if not stopped and should_stop():
++                    stopped = True
++                    for g in futs:
++                        g.cancel()
++    if stopped:
++        log.info("  null test: STOPPED EARLY after %d replicates: %d of them already match or beat the observed result, "
++                 "so p >= %.3f and more replicates cannot turn this into a significant result", len(done_rows),
++                 h_stop, h_stop / len(done_rows))
++    rows = [done_rows[r] for r in sorted(done_rows)]
++    reps = len(rows)
+     N = np.array(rows)                                                   # (reps, n_metrics)
+     obs = np.array([observed[m] for m in metrics])
+     mu = N.mean(0)
+@@ -257,7 +381,9 @@
+     t_obs = float(z_obs.max())
+     t_null = ((N - mu) / sd).max(1)
+     p_max = float((1.0 + (t_null >= t_obs).sum()) / (reps + 1.0))
+-    return dict(metrics=metrics, reps=reps, null_mean=dict(zip(metrics, map(float, mu))),
++    if stopped:
++        p_max = max(p_max, float((t_null >= t_obs).sum()) / reps)          # Besag-Clifford p = h / r
++    return dict(metrics=metrics, reps=reps, early_stopped=bool(stopped), null_mean=dict(zip(metrics, map(float, mu))),
+                 null_sd=dict(zip(metrics, map(float, sd))), p_raw=dict(zip(metrics, map(float, p_raw))),
+                 z_obs=dict(zip(metrics, map(float, z_obs))), t_obs=t_obs, p_maxT=p_max,
+                 resolution=1.0 / (reps + 1.0))
+@@ -268,7 +394,7 @@
+     ec = cfg["eval"]
+     p_corr = min(1.0, null["p_maxT"] * ec["n_games"])
+     ok = p_corr < ec["alpha"]
+-    reachable = null["resolution"] * ec["n_games"] < ec["alpha"]
++    reachable = null["resolution"] * ec["n_games"] < ec["alpha"] or bool(null.get("early_stopped"))
+     return ok, p_corr, reachable
+ 
+ 
+@@ -362,7 +488,9 @@
+     w("")
+     w(f"Walk-forward over the last **{lay['eval_n']}** draws, retrain every **{lay['cad']}**, ensemble weights tuned on the "
+       f"preceding **{lay['val_len']}**-draw validation window only. Null test: **{null['reps']}** label-permuted replicates "
+-      f"(p-value resolution {null['resolution']:.4f}).")
++      f"(p-value resolution {null['resolution']:.4f})"
++      + (", stopped early: enough replicates already beat the observed result to rule out significance." if null.get(
++          "early_stopped") else "."))
+     w("")
+     w("### Main result (ensemble vote)")
+     w("")
+@@ -396,7 +524,8 @@
+     w(f"| expert | mean weight | log-loss skill | hits top-{N_DRAWN} | active share |")
+     w("|---|---|---|---|---|")
+     for name, r in expert_tbl.items():
+-        w(f"| {name} | {r['mean_weight']:.3f} | {r['skill']:+.5f} | {r['h5']:.3f} | {r['active_share']:.2f} |")
++        h5 = "n/a (silent)" if r["h5"] != r["h5"] else f"{r['h5']:.3f}"
++        w(f"| {name} | {r['mean_weight']:.3f} | {r['skill']:+.5f} | {h5} | {r['active_share']:.2f} |")
+     if tft_skills:
+         last = [b for b in tft_skills if not b.get("final")]
+         sk = [s for b in last for s in b["skills"]]
+--- a/experts.py
++++ b/experts.py
+@@ -23,6 +23,7 @@
+ 
+ log = logging.getLogger("nla.experts")
+ warnings.filterwarnings("ignore", message=".*eval_set.*")   # newer lightgbm renames the argument; both work
++warnings.filterwarnings("ignore", message=".*does not have valid feature names.*")   # numpy arrays in, numpy arrays out
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -131,6 +132,74 @@
+ 
+ 
+ # --------------------------------------------------------------------------- #
++# Pointwise learners: MLP and gradient booster (per-ball rows, binary target "ball drawn")
++# --------------------------------------------------------------------------- #
++def _make_pointwise(kind, cfg, seed):
++    pc = cfg[kind]
++    if kind == "mlp":
++        from sklearn.neural_network import MLPClassifier
++        from sklearn.pipeline import make_pipeline
++        from sklearn.preprocessing import StandardScaler
++        return make_pipeline(StandardScaler(), MLPClassifier(
++            hidden_layer_sizes=tuple(pc["hidden"]), alpha=pc["alpha"], learning_rate_init=pc["lr"],
++            batch_size=pc["batch"], max_iter=pc["max_iter"], early_stopping=True, validation_fraction=0.15,
++            n_iter_no_change=pc["patience"], random_state=seed))
++    try:
++        import lightgbm as lgb
++        return lgb.LGBMClassifier(objective="binary", random_state=seed, verbose=-1, **pc["params"])
++    except ImportError:
++        from sklearn.ensemble import HistGradientBoostingClassifier
++        return HistGradientBoostingClassifier(max_iter=200, learning_rate=0.03, max_leaf_nodes=15, l2_regularization=10.0,
++                                              min_samples_leaf=300, random_state=seed)
++
++
++def fit_pointwise(kind, F, X, t_end, cfg, seed):
++    """Train on draws [t0, split), choose a temperature on [split, t_end); active only if validation skill > 0."""
++    pc = cfg[kind]
++    nb, nf = X.shape[1], F.shape[2]
++    t0 = max(pc["warmup"], t_end - pc["train_window"])
++    n_val = max(int(pc["val_frac"] * (t_end - t0)), pc["min_val"])
++    split = t_end - n_val
++    model = _make_pointwise(kind, cfg, seed)
++    model.fit(F[t0:split].reshape(-1, nf), X[t0:split].reshape(-1).astype(int))
++    score = lambda A: np.log(np.clip(model.predict_proba(A)[:, 1], 1e-9, 1.0))
++    sv = score(F[split:t_end].reshape(-1, nf)).reshape(t_end - split, nb)
++    Xval = X[split:t_end].astype(float)
++    best_tau, best_bce = None, float("inf")
++    for tau in cfg["ranker"]["tau_grid"]:
++        bc = bce_rows(_scores_to_probs(sv, tau), Xval)
++        if bc < best_bce:
++            best_tau, best_bce = tau, bc
++    sk = skill_of(best_bce, nb)
++    log.debug("  %s t_end=%d tau=%.2f val_skill=%+.5f", kind, t_end, best_tau, sk)
++    return dict(score=score, tau=best_tau, skill=sk, active=bool(sk > 0.0))
++
++
++def walk_forward_pointwise(kind, F, X, a0, n, cfg, seed, cad, predict_next=False, quiet=False):
++    nb = X.shape[1]
++    out = np.empty((n - a0, nb))
++    act = np.zeros(n - a0, dtype=bool)
++    skills = []
++    for a in range(a0, n, cad):
++        b = min(a + cad, n)
++        bd = fit_pointwise(kind, F, X, a, cfg, seed)
++        out[a - a0:b - a0] = ranker_predict(bd, F, a, b, nb)
++        act[a - a0:b - a0] = bd["active"]
++        skills.append(bd["skill"])
++        if not quiet:
++            log.info("  %s fit @%d: val skill %+.5f -> %s", kind, a, bd["skill"], "active" if bd["active"] else "silent")
++    nxt = None
++    if predict_next:
++        bd = fit_pointwise(kind, F, X, n, cfg, seed)
++        nxt = (ranker_predict(bd, F, n, n + 1, nb)[0], bd["active"])
++        skills.append(bd["skill"])
++        if not quiet:
++            log.info("  %s fit @%d (NEXT DRAW): val skill %+.5f -> %s", kind, n, bd["skill"],
++                     "active" if bd["active"] else "silent")
++    return out, dict(active=act, skills=skills), nxt
++
++
++# --------------------------------------------------------------------------- #
+ # TFT army
+ # --------------------------------------------------------------------------- #
+ def torch_device(name: str):
+@@ -321,7 +390,7 @@
+     X = np.array(d.X, dtype=np.float32)
+     X[n:] = 0.0
+     nrow = n - span_start
+-    names = [k for k in ("tft_army", "ranker", "hazard", "markov", "anchor") if k in enabled]
++    names = [k for k in ("tft_army", "ranker", "hazard", "markov", "anchor", "mlp", "booster") if k in enabled]
+     fr.assert_no_banned_experts(names, cfg, "run_experts")
+     fr.assert_no_banned(fb.names, cfg, "run_experts", allow_rate100=bool(cfg["features"].get("use_rate100")))
+     res = dict(probs={k: np.empty((nrow, nb)) for k in names}, active={k: np.ones(nrow, dtype=bool) for k in names},
+@@ -348,9 +417,16 @@
+         res["active"]["ranker"][:] = info["active"]
+         if nxt is not None:
+             res["next"]["ranker"], res["next_active"]["ranker"] = nxt[0], bool(nxt[1])
++    for kind in ("mlp", "booster"):
++        if kind in names:
++            pr, info, nxt = walk_forward_pointwise(kind, fb.F, X, span_start, n, cfg, seed, cad, predict_next, quiet)
++            res["probs"][kind][:] = pr
++            res["active"][kind][:] = info["active"]
++            if nxt is not None:
++                res["next"][kind], res["next_active"][kind] = nxt[0], bool(nxt[1])
+     if "anchor" in names:
+         import anchor as an
+-        pr, act, info, nxt = an.run_anchor(d, fb, cfg, span_start, n, cad, predict_next)
++        pr, act, info, nxt = an.run_anchor(d, fb, cfg, span_start, n, cad, predict_next, quiet=quiet)
+         res["probs"]["anchor"][:] = pr
+         res["active"]["anchor"][:] = act
+         res["anchor_info"] = info
+--- a/nla_config.py
++++ b/nla_config.py
+@@ -50,6 +50,31 @@
+         "tau_grid": [0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0],   # score temperature for p; "inf" = uniform is implicit
+     },
+ 
++    # ------------------------------------------------------------------ MLP (pointwise, per-ball rows)
++    "mlp": {
++        "warmup": 120,
++        "train_window": 1500,
++        "val_frac": 0.15,
++        "min_val": 60,
++        "hidden": [64, 32],
++        "alpha": 1e-3,                       # L2
++        "lr": 1e-3,
++        "batch": 512,
++        "max_iter": 60,
++        "patience": 6,
++    },
++
++    # ------------------------------------------------------------------ gradient booster (pointwise, binary)
++    "booster": {
++        "warmup": 120,
++        "train_window": 1500,
++        "val_frac": 0.15,
++        "min_val": 60,
++        "params": dict(n_estimators=300, learning_rate=0.03, num_leaves=15, min_child_samples=300,
++                       subsample=0.8, subsample_freq=1, colsample_bytree=0.8, reg_lambda=10.0, n_jobs=-1,
++                       deterministic=True, force_row_wise=True),
++    },
++
+     # ------------------------------------------------------------------ TFT army
+     "tft": {
+         "army": 5,
+@@ -86,14 +111,24 @@
+         "fast_grid": [0.02, 0.05, 0.1, 0.2, 0.4],
+         "max_top_jaccard": 0.40,             # HARD anti-stagnation cap: mean Jaccard of top-K of consecutive draws (1.0 = frozen)
+         "gate_margin": 0.0,                  # hold-out log-loss skill must exceed this, else the expert is silent
++        "always_on": False,                  # MEASUREMENT mode: forecast in every block (gate logged, not enforced; cap relaxed
++                                             # to the lowest achievable Jaccard + cap_relax when nothing meets it)
++        "cap_relax": 0.05,
+     },
+ 
+     # ------------------------------------------------------------------ ensemble
+     "ensemble": {
+-        "multipliers": {"tft_army": 2.0, "ranker": 2.0, "hazard": 1.5, "markov": 1.5, "anchor": 2.0},
++        "multipliers": {"tft_army": 2.0, "ranker": 2.0, "hazard": 1.5, "markov": 1.5, "anchor": 2.0, "mlp": 2.0,
++                        "booster": 2.0},
+         "val_len": 200,                      # validation window (draws) that precedes every test block
+         "hedge_eta": 2.0,                    # exponent on the validation log-score gain
+         "vote_mode": "rank",                 # rank | prob
++        "min_track_record": 0.5,             # an expert must have been ACTIVE on >= this share of the validation window to
++                                             # get any weight (a silent expert scores gain 0 there, which beats every expert
++                                             # with a slightly negative gain, so without this rule silence is rewarded)
++        "require_positive_gain": False,      # True: experts whose validation log-score gain is <= 0 get weight 0
++        "top2_mode": "vote",                 # vote | consensus (Top-2 = balls ranked high by EVERY heavy expert)
++        "consensus_share": 0.25,             # an expert is "heavy" when its share of the total vote weight is >= this
+     },
+ 
+     # ------------------------------------------------------------------ evaluation
+@@ -102,6 +137,8 @@
+         "min_eval_draws": 300,
+         "retrain_every": 100,
+         "null_reps": 500,
++        "early_stop_h": 10,                  # stop the null test once this many replicates match/beat the observed result
++        "early_stop_min": 20,                # ... but never before this many replicates (0 for h = no early stop)
+         "boot_reps": 1000,
+         "n_games": 4,                        # Bonferroni family (Main, Noonrush, Vag, Daywa)
+         "alpha": 0.05,
+--- a/stage4_astronomical.py
++++ b/stage4_astronomical.py
+@@ -25,6 +25,7 @@
+ import io
+ import json
+ import math
++import os
+ import sys
+ import time
+ from pathlib import Path
+@@ -51,19 +52,36 @@
+     ap.add_argument("--eval-draws", type=int, default=0, help="walk-forward test draws (>= 300); 0 = config default")
+     ap.add_argument("--retrain-every", type=int, default=0)
+     ap.add_argument("--null-reps", type=int, default=-1, help="null-test replicates; -1 = config default (500)")
++    ap.add_argument("--null-workers", type=int, default=1,
++                    help="parallel processes for the null test; 0 = auto (2 on a GPU runtime, else one per 2 CPU cores). "
++                         "Same replicates as serial")
++    ap.add_argument("--no-early-stop", action="store_true",
++                    help="run every null replicate even when the result is already clearly not significant")
+     ap.add_argument("--no-tft", action="store_true")
+     ap.add_argument("--no-ranker", action="store_true")
+     ap.add_argument("--no-anchor", action="store_true")
++    ap.add_argument("--no-mlp", action="store_true")
++    ap.add_argument("--no-booster", action="store_true")
+     ap.add_argument("--no-twin", action="store_true")
+     ap.add_argument("--no-ablation", action="store_true")
+     ap.add_argument("--no-wheel", action="store_true")
+     ap.add_argument("--vote-mode", default="", choices=["", "rank", "prob"])
++    ap.add_argument("--top2-mode", default="", choices=["", "vote", "consensus"],
++                    help="vote: Top-2 = first 2 of the weighted vote; consensus: balls every heavy expert ranks high")
++    ap.add_argument("--anchor-always-on", action="store_true",
++                    help="measurement mode: the anchor forecasts in every walk-forward block AND the next draw")
++    ap.add_argument("--min-track-record", type=float, default=-1.0,
++                    help="share of the validation window an expert must have been active to get weight; -1 = config")
++    ap.add_argument("--require-positive-gain", action="store_true",
++                    help="experts with validation log-score gain <= 0 vs uniform get weight 0")
+     ap.add_argument("--payout", type=float, default=0.0)
+     ap.add_argument("--wheel-size", type=int, default=0)
+     ap.add_argument("--wheel-ticket", type=int, default=2)
+     ap.add_argument("--wheel-price", type=float, default=1.0)
+     ap.add_argument("--wheel-pair-price", action="store_true")
+     ap.add_argument("--game", default="", help="label for the report (default: CSV name)")
++    ap.add_argument("--tracker", default="", help="live-test ledger the pick is appended to (default: <out-dir>/tracker.csv)")
++    ap.add_argument("--no-tracker", action="store_true")
+     extra, _ = ap.parse_known_args(argv)
+     for k, v in vars(extra).items():
+         setattr(args, k, v)
+@@ -79,8 +97,18 @@
+         cfg["eval"]["retrain_every"] = args.retrain_every
+     if args.null_reps >= 0:
+         cfg["eval"]["null_reps"] = args.null_reps
++    if args.no_early_stop:
++        cfg["eval"]["early_stop_h"] = 0
+     if args.vote_mode:
+         cfg["ensemble"]["vote_mode"] = args.vote_mode
++    if args.top2_mode:
++        cfg["ensemble"]["top2_mode"] = args.top2_mode
++    if args.anchor_always_on:
++        cfg["anchor"]["always_on"] = True
++    if args.min_track_record >= 0:
++        cfg["ensemble"]["min_track_record"] = args.min_track_record
++    if args.require_positive_gain:
++        cfg["ensemble"]["require_positive_gain"] = True
+     if args.quick:
+         log.warning("--quick: relaxed floors (eval draws, TFT epochs, null reps). Results are a smoke test, NOT a verdict.")
+         cfg["eval"].update(eval_draws=min(cfg["eval"]["eval_draws"], 100), retrain_every=50,
+@@ -132,21 +160,32 @@
+     n, nb = d.n, d.X.shape[1]
+     names = [k for k in eh.ENSEMBLE_EXPERTS if k in res["next"]]
+     fr.assert_no_banned_experts(names, cfg, "next-draw vote")
+-    w, gains, _ = eh.block_weights(res, d.P, cfg, n, lay["span_start"], lay["val_len"], active_override=res["next_active"])
++    w, gains, hedge = eh.block_weights(res, d.P, cfg, n, lay["span_start"], lay["val_len"], active_override=res["next_active"])
+     sw = sum(w.values())
++    ec = cfg["ensemble"]
++    for k in names:
++        log.info("Next-draw weight | %-8s val gain %+8.3f | hedge %.3f | active now %s | active on validation window %.0f%% "
++                 "| weight %.3f", k, gains[k], hedge[k], bool(res["next_active"][k]),
++                 100 * float(np.mean(res["active"][k][n - lay["val_len"] - lay["span_start"]:])), w[k])
+     if sw <= 0:
+         log.warning("Next draw: every expert has weight 0 (none shows validated signal). Uniform forecast; the picks below "
+                     "fall back to fixed ball order and carry NO information.")
+         p = np.full(nb, N_DRAWN / nb)
+         score = np.zeros(nb)
++        cons = score
+     else:
+         p = fr.norm_inc(sum(w[k] * res["next"][k] for k in names) / sw)
+-        if cfg["ensemble"]["vote_mode"] == "rank":
++        if ec["vote_mode"] == "rank":
+             score = sum(w[k] * eh._rank_points(res["next"][k][None, :])[0] for k in names) / sw + 1e-6 * p
+         else:
+             score = p.copy()
++        cons = eh.consensus_scores({k: res["next"][k][None, :] for k in names}, w, score[None, :],
++                                   ec.get("consensus_share", 0.25))[0]
+     order = np.argsort(-score, kind="stable")
+-    return dict(p_play=p, score=score, order=[int(b) + 1 for b in order], weights=w, names=names)
++    corder = np.argsort(-cons, kind="stable")
++    top2 = corder[:2] if ec.get("top2_mode", "vote") == "consensus" else order[:2]
++    return dict(p_play=p, score=score, order=[int(b) + 1 for b in order], cons_order=[int(b) + 1 for b in corder],
++                top2=[int(b) + 1 for b in top2], weights=w, names=names)
+ 
+ 
+ # --------------------------------------------------------------------------- #
+@@ -197,12 +236,18 @@
+ 
+     d = s2.load_data(args.csv, out_dir, args.next_date, args.next_shifted, args.next_holiday_shift)
+     n = d.n
++    if pd.Timestamp(d.info["next_date"]).date() < pd.Timestamp.now().date():
++        log.warning("!!! The draw being predicted (%s) is in the PAST. Add the latest results to %s first (python "
++                    "tracker.py add-draw ...). This pick is a re-run of an old draw and the tracker will mark it LATE.",
++                    d.info["next_date"], args.csv)
+     lay = eh.layout(n, cfg, quick=args.quick)
+     log.info("Layout: %d draws | validation pre-roll draws %d..%d | TEST draws %d..%d (%s .. %s) | cadence %d",
+              n, lay["span_start"], lay["eval_start"] - 1, lay["eval_start"], n - 1, d.dates[lay["eval_start"]].date(),
+              d.dates[n - 1].date(), lay["cad"])
+ 
+-    enabled = [k for k in eh.ENSEMBLE_EXPERTS if not (k == "tft_army" and args.no_tft) and not (k == "ranker" and args.no_ranker) and not (k == "anchor" and args.no_anchor)]
++    off = {"tft_army": args.no_tft, "ranker": args.no_ranker, "anchor": args.no_anchor, "mlp": args.no_mlp,
++           "booster": args.no_booster}
++    enabled = [k for k in eh.ENSEMBLE_EXPERTS if not off.get(k, False)]
+     fr.assert_no_banned_experts(enabled, cfg, "enabled experts")
+     seed = cfg["seed"]
+ 
+@@ -225,7 +270,16 @@
+     if reps < 79:
+         log.warning("With %d replicates the smallest attainable p is %.4f; Bonferroni x%d can never reach alpha. "
+                     "Use >= 100 (ideally the default 500) for a real verdict.", reps, 1 / (reps + 1), cfg["eval"]["n_games"])
+-    null = eh.null_test(d, cfg, lay, enabled, args.device, reps, seed, obs, ckpt=out_dir / f"null_ckpt_{tag}.json")
++    workers = args.null_workers
++    if workers <= 0:
++        try:
++            import torch
++            gpu = torch.cuda.is_available() and args.device != "cpu"
++        except ImportError:
++            gpu = False
++        workers = 2 if gpu else max(1, (os.cpu_count() or 2) // 2)
++    null = eh.null_test(d, cfg, lay, enabled, args.device, reps, seed, obs, ckpt=out_dir / f"null_ckpt_{tag}.json",
++                        workers=workers)
+     ok, p_corr, reachable = eh.verdict(null, cfg, tag)
+ 
+     # ---------------- ablation + diagnostics
+@@ -248,8 +302,10 @@
+         pe = p[lay["eval_start"] - lay["span_start"]:]
+         sc, pdr = eh.compute_metrics(pe, pe, Xe, cfg)
+         wm = np.mean([b["weights"].get(k, 0.0) for b in obs_run["wlog"]])
+-        expert_tbl[k] = dict(mean_weight=float(wm), skill=sc["logloss_skill"], h5=sc["hits_top5"],
+-                             active_share=float(res["active"][k][lay["eval_start"] - lay["span_start"]:].mean()))
++        ash = float(res["active"][k][lay["eval_start"] - lay["span_start"]:].mean())
++        # a silent expert's forecast is uniform, so its "top-5" is just balls 1..5 (stable tie-break): not a measurement
++        expert_tbl[k] = dict(mean_weight=float(wm), skill=sc["logloss_skill"], h5=sc["hits_top5"] if ash > 0 else float("nan"),
++                             active_share=ash)
+ 
+     # ---------------- verdict text
+     ch = eh.chance_levels(nb, cfg)
+@@ -265,7 +321,7 @@
+ 
+     # ---------------- next-draw play + twin + wheel
+     nxt = next_play(res, d, cfg, lay)
+-    final2, final5 = nxt["order"][:2], nxt["order"][:N_DRAWN]
++    final2, final5 = nxt["top2"], nxt["order"][:N_DRAWN]
+     wheel_k = args.wheel_size or core_size(cfg, nb)
+     wheel_core = nxt["order"][:wheel_k]
+     twin = None
+@@ -275,11 +331,22 @@
+         pos_uniform = np.full((N_DRAWN, nb), 1.0 / nb)       # no all-history positional table feeds the twin
+         twin = s2.run_twin(d, nxt["p_play"], pos_uniform, args, np.random.default_rng(seed))
+ 
+-    L = [md, "", "## Next draw", ""]
++    t2, ch2 = obs_run["top2"], 2 * N_DRAWN / nb
++    L = [md, "### Top-2 over the walk-forward (diagnostic, not part of the max-T null test)", "",
++         f"| Top-2 mode | mean hits in Top-2 (chance {ch2:.3f}) | at least 1 drawn (chance {1 - math.comb(nb - 2, N_DRAWN) / math.comb(nb, N_DRAWN):.3f}) "
++         f"| both drawn (chance {chance_pair(nb):.4f}) | draws |", "|---|---|---|---|---|"]
++    for mname, r in t2.items():
++        lo_, hi_ = eh.wilson(int((r["h"] >= 2).sum()), r["n"])
++        L.append(f"| {mname}{' (used for the play)' if mname == cfg['ensemble'].get('top2_mode', 'vote') else ''} | "
++                 f"{r['hits']:.3f} | {r['any']:.3f} | {r['both']:.4f} [{lo_:.4f}, {hi_:.4f}] | {r['n']} |")
++    L += ["", "With ~300 test draws a 'both drawn' rate is a handful of events: the CI above is what it can and cannot rule out.",
++          "", "## Next draw", ""]
+     nd = d.dates[n].day_name()
+     status = ("validated by the harness" if ok else "NOT validated: no skill vs chance was detected, treat as arbitrary picks")
+     L.append(f"Draw {d.info['next_date']} ({nd}). Vote of {', '.join(nxt['names'])} with weights "
+              f"{ {k: round(float(v), 3) for k, v in nxt['weights'].items()} }.")
++    L.append(f"Top-2 mode: {cfg['ensemble'].get('top2_mode', 'vote')} | vote Top-2 = {nxt['order'][0]}, {nxt['order'][1]} | "
++             f"consensus Top-2 = {nxt['cons_order'][0]}, {nxt['cons_order'][1]}")
+     L.append(f"TOP 2 = {final2[0]}, {final2[1]} | TOP 5 = {', '.join(map(str, final5))} | WHEEL CORE ({wheel_k}) = "
+              f"{', '.join(map(str, wheel_core))} | status: {status}")
+     L.append(f"Chance for both top-2 numbers: {100 * chance_pair(nb):.3f}%; at least 2 of the {wheel_k} core numbers: "
+@@ -315,13 +382,23 @@
+                "ablation": {k: {"scalars": v["scalars"], "ci": v["ci"]} for k, v in abl.items()},
+                "chi_square": chi, "jaccard_consecutive": jac, "jaccard_chance": jac_ch,
+                "weights_by_block": obs_run["wlog"], "tft_skills": res["tft_skills"], "anchor_info": res.get("anchor_info", []),
++               "top2_walk_forward": {k: {m: v[m] for m in ("hits", "both", "any", "n")} for k, v in obs_run["top2"].items()},
+                "next": {"date": d.info["next_date"], "p_play": nxt["p_play"].tolist(), "final_top2": final2,
+-                        "final_top5": final5, "wheel_core": wheel_core, "wheel_size": wheel_k,
++                        "final_top5": final5, "vote_top2": nxt["order"][:2], "consensus_top2": nxt["cons_order"][:2],
++                        "wheel_core": wheel_core, "wheel_size": wheel_k,
+                         "play_models": nxt["names"], "play_weights": [float(nxt["weights"][k]) for k in nxt["names"]]},
+                "config": cfg}
+     (out_dir / f"stage4_results_{tag}_{stamp}.json").write_text(json.dumps(payload, indent=2, default=float))
+     (out_dir / f"eval_{tag}_{stamp}.json").write_text(json.dumps(
+         {k: payload[k] for k in ("N", "game", "p_maxT", "p_corrected", "verdict", "eval_draws", "null_reps")}, indent=2))
++    if not args.no_tracker:
++        import tracker
++        tpath = Path(args.tracker) if args.tracker else out_dir / "tracker.csv"
++        added = tracker.log_prediction(tpath, args.game or tag, d.info["next_date"], nb, final2, final5, wheel_core,
++                                       cfg["ensemble"].get("top2_mode", "vote"), "SKILL" if ok else "no skill")
++        log.info("Live tracker: %s for %s %s in %s (score later with: python tracker.py score --csv %s)",
++                 "pick LOGGED" if added else "a pick was already logged (first one kept)", args.game or tag,
++                 d.info["next_date"], tpath, args.csv)
+     print("\n" + report)
+     print("\n" + "#" * 78)
+     print(f"VERDICT {args.game or tag}: {verdict_txt}")
+--- a/test_pipeline.py
++++ b/test_pipeline.py
+@@ -241,6 +241,72 @@
+     assert an.top_jaccard(Z[300:600, :, 0], 12) > 0.4
+ 
+ 
++def test_track_record_rule_blocks_silent_expert():
++    """An expert that was silent (uniform) on the validation window must get weight 0 even if it is active now; without the
++    rule its gain of 0 beats experts with negative gain and it takes the biggest weight (the live-vs-backtest anchor bug)."""
++    cfg = _cfg()
++    nb, rows, span = 39, 300, 1000
++    rng = np.random.default_rng(5)
++    P = np.array([rng.choice(nb, N_DRAWN, replace=False) for _ in range(span + rows + 1)])
++    noisy = fr.norm_inc(rng.uniform(0.05, 0.25, size=(rows, nb)))          # random forecasts: negative gain on average
++    res = dict(probs={"markov": noisy, "anchor": np.full((rows, nb), N_DRAWN / nb)},
++               active={"markov": np.ones(rows, bool), "anchor": np.zeros(rows, bool)})
++    over = {"markov": True, "anchor": True}                               # anchor wakes up only for the final fit
++    cfg["ensemble"]["min_track_record"] = 0.0
++    w_old, g, _ = eh.block_weights(res, P, cfg, span + rows, span, 200, active_override=over)
++    assert abs(g["anchor"]) < 1e-6 and g["markov"] < 0 and w_old["anchor"] > w_old["markov"], "bug reproduction failed"
++    cfg["ensemble"]["min_track_record"] = 0.5
++    w_new, _, _ = eh.block_weights(res, P, cfg, span + rows, span, 200, active_override=over)
++    assert w_new["anchor"] == 0.0 and w_new["markov"] > 0
++
++
++def test_consensus_top2_needs_every_heavy_expert():
++    nb = 10
++    a = np.array([[10, 9, 8, 7, 6, 5, 4, 3, 2, 1]], float) / 55 * N_DRAWN     # A ranks ball 0 first
++    b = np.array([[1, 9, 2, 8, 10, 5, 4, 3, 6, 7]], float) / 55 * N_DRAWN      # B ranks ball 4 first, ball 0 last
++    w = {"A": 1.0, "B": 1.0, "C": 0.01}
++    c = np.full((1, nb), 0.5)
++    vote = sum(w[k] * eh._rank_points(p) for k, p in (("A", a), ("B", b), ("C", c)))
++    s = eh.consensus_scores({"A": a, "B": b, "C": c}, w, vote, 0.25)
++    top2 = list(np.argsort(-s[0], kind="stable")[:2])
++    assert top2 == [1, 3], top2                          # ball 1 is #2 for both, ball 3 is #4/#3: no veto from either
++    assert 0 not in top2                                 # ball 0 is #1 for A but last for B
++
++
++def test_anchor_always_on_forecasts_every_block():
++    import anchor as an
++    d, cfg = make_synthetic(700, 39, 13), _cfg()
++    cfg["anchor"]["always_on"] = True
++    fa = fr.build_features(d, cfg)
++    out, act, info, nxt = an.run_anchor(d, fa, cfg, 400, 700, 50, predict_next=True, quiet=True)
++    assert act.all() and nxt[1], [r["reason"] for r in info]
++    assert all(r["reason"].startswith("ok") for r in info)
++
++
++def test_pointwise_experts_run_and_gate():
++    d, cfg = make_synthetic(700, 39, 21), _cfg()
++    fb = fr.build_features(d, cfg)
++    for kind in ("mlp", "booster"):
++        cfg[kind].update(train_window=400, min_val=60)
++        if kind == "mlp":
++            cfg["mlp"]["max_iter"] = 5
++        else:
++            cfg["booster"]["params"]["n_estimators"] = 30
++        pr, info, nxt = ex.walk_forward_pointwise(kind, fb.F, d.X.astype(np.float32), 600, 700, cfg, 1, 50, True, quiet=True)
++        assert pr.shape == (100, 39) and np.allclose(pr.sum(1), N_DRAWN, atol=1e-3)
++        assert nxt[0].shape == (39,)
++
++
++def test_tracker_logs_once_and_flags_late(tmp_path=None):
++    import tempfile
++    import tracker as tk
++    p = Path(tempfile.mkdtemp()) / "t.csv"
++    assert tk.log_prediction(p, "g", "2026-10-21", 39, [1, 2], [1, 2, 3, 4, 5], list(range(1, 11)))
++    assert not tk.log_prediction(p, "g", "2026-10-21", 39, [9, 8], [9, 8, 7, 6, 5], list(range(30, 40)))
++    rows = tk.read_ledger(p)
++    assert len(rows) == 1 and rows[0]["top2"] == "1 2"
++
++
+ TESTS = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
+ 
+ 
+--- a/features_recent.py
++++ b/features_recent.py
+@@ -25,8 +25,23 @@
+ # --------------------------------------------------------------------------- #
+ # Small helpers
+ # --------------------------------------------------------------------------- #
++def make_deterministic() -> None:
++    """Bit-for-bit repeatable GPU training: without this, cuDNN picks non-deterministic LSTM kernels and the same
++    command can give a different wheel core on a T4."""
++    import os
++    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
++    try:
++        import torch
++        torch.backends.cudnn.deterministic = True
++        torch.backends.cudnn.benchmark = False
++        torch.use_deterministic_algorithms(True, warn_only=True)
++    except ImportError:
++        pass
++
++
+ def seed_everything(seed: int) -> None:
+     """Seeds python / numpy / torch. Training randomness is not output randomness: this only makes runs reproducible."""
++    make_deterministic()
+     random.seed(seed)
+     np.random.seed(seed)
+     try:
+--- a/tracker.py
++++ b/tracker.py
+@@ -0,0 +1,203 @@
++#!/usr/bin/env python3
++"""
++tracker.py: LIVE forward test. Every stage4 run appends its picks to a ledger BEFORE the draw; once the draw is in the
++CSV, `score` compares each logged pick with what was actually drawn and tests the running totals against chance.
++
++This is the one test no backtest setting can flatter: the picks are frozen in the ledger before the numbers exist.
++
++    !python stage4_astronomical.py --csv daywa_clean.csv --null-reps 10      # logs the pick to outputs/tracker.csv
++    ... after the draw, add it to daywa_clean.csv ...
++    !python tracker.py add-draw --csv daywa_clean.csv --date 2026-10-21 --numbers 23 32 26 11 22   # record a result
++    !python tracker.py score --csv daywa_clean.csv                          # scores every logged pick so far
++
++Keep outputs/tracker.csv safe between Colab sessions (download it, or point --tracker at Google Drive).
++A pick logged AFTER its draw date is marked LATE and never counted.
++"""
++from __future__ import annotations
++
++import argparse
++import csv
++import math
++import sys
++import time
++from pathlib import Path
++
++import numpy as np
++import pandas as pd
++from scipy import stats
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++from nla_config import N_DRAWN, chance_core, chance_pair
++
++FIELDS = ["game", "draw_date", "logged_at", "n_balls", "top2", "top5", "core", "top2_mode", "verdict"]
++
++
++def _fmt(nums):
++    return " ".join(str(int(x)) for x in nums)
++
++
++def _parse(s):
++    return [int(x) for x in str(s).split()] if str(s).strip() else []
++
++
++def log_prediction(path, game, draw_date, n_balls, top2, top5, core, top2_mode="vote", verdict=""):
++    """Append one pick; an existing row for the same game + draw date is kept (the FIRST pick counts, not the best)."""
++    path = Path(path)
++    rows = read_ledger(path)
++    if any(r["game"] == game and r["draw_date"] == str(draw_date) for r in rows):
++        return False
++    new = not path.exists()
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with path.open("a", newline="") as f:
++        w = csv.DictWriter(f, fieldnames=FIELDS)
++        if new:
++            w.writeheader()
++        w.writerow(dict(game=game, draw_date=str(draw_date), logged_at=time.strftime("%Y-%m-%d %H:%M:%S"),
++                        n_balls=int(n_balls), top2=_fmt(top2), top5=_fmt(top5), core=_fmt(core), top2_mode=top2_mode,
++                        verdict=verdict))
++    return True
++
++
++def read_ledger(path):
++    path = Path(path)
++    if not path.exists():
++        return []
++    with path.open(newline="") as f:
++        return list(csv.DictReader(f))
++
++
++def actual_draws(csv_path):
++    """{date 'YYYY-MM-DD': set(numbers)} from a game CSV (Date, Number1..Number5)."""
++    raw = pd.read_csv(csv_path, dtype=str, keep_default_na=False, encoding="utf-8-sig", skipinitialspace=True)
++    raw.columns = [str(c).strip() for c in raw.columns]
++    cols = [f"Number{i}" for i in range(1, N_DRAWN + 1)]
++    out = {}
++    for _, r in raw.iterrows():
++        try:
++            d = pd.to_datetime(r["Date"], dayfirst=False).date().isoformat()
++            nums = {int(float(r[c])) for c in cols}
++        except (ValueError, TypeError):
++            continue
++        if len(nums) == N_DRAWN:
++            out[d] = nums
++    return out
++
++
++def add_draw(csv_path, date, numbers):
++    """Insert one result into a game CSV in the file's own layout (newest-first, Number1..5 in drawn order).
++    Refuses duplicates and anything that is not 5 distinct whole numbers inside the file's pool."""
++    date = pd.Timestamp(date).date().isoformat()
++    nums = [int(x) for x in numbers]
++    if len(nums) != N_DRAWN or len(set(nums)) != N_DRAWN or min(nums) < 1:
++        raise SystemExit(f"need {N_DRAWN} distinct positive numbers, got {nums}")
++    raw = pd.read_csv(csv_path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
++    raw.columns = [str(c).strip() for c in raw.columns]
++    cols = [f"Number{i}" for i in range(1, N_DRAWN + 1)]
++    pool = int(pd.to_numeric(raw[cols].stack(), errors="coerce").quantile(0.999))
++    if max(nums) > pool:
++        raise SystemExit(f"{max(nums)} is outside this game's pool (1..{pool})")
++    dates = pd.to_datetime(raw["Date"], errors="coerce")
++    if (dates.dt.date.astype(str) == date).any():
++        raise SystemExit(f"{csv_path} already has a row for {date}; nothing changed")
++    day = pd.Timestamp(date).day_name()
++    row = {c: "" for c in raw.columns}
++    row.update(Date=date, **{c: f"{float(v):.1f}" for c, v in zip(cols, nums)})
++    for c, v in (("Promotionday", day), ("RealDay", day), ("WasShifted", "0")):
++        if c in row:
++            row[c] = v
++    newest_first = len(dates) > 1 and dates.iloc[0] > dates.iloc[-1]
++    new_ts = pd.Timestamp(date)                                       # insert in place; every other row keeps its order
++    if newest_first:
++        later = np.where(dates.to_numpy() > np.datetime64(new_ts))[0]
++        pos = int(later.max()) + 1 if len(later) else 0
++    else:
++        earlier = np.where(dates.to_numpy() < np.datetime64(new_ts))[0]
++        pos = int(earlier.max()) + 1 if len(earlier) else 0
++    out = pd.concat([raw.iloc[:pos], pd.DataFrame([row]), raw.iloc[pos:]], ignore_index=True)
++    out.to_csv(csv_path, index=False)
++    print(f"Added {date} ({day}): {' '.join(map(str, nums))} to {csv_path} ({len(out)} rows)")
++
++
++def _z_p(obs_sum, mean, var, n):
++    """One-sided p-value (better than chance) for a sum of n independent per-draw scores."""
++    if n == 0 or var <= 0:
++        return float("nan")
++    z = (obs_sum - n * mean) / math.sqrt(n * var)
++    return float(stats.norm.sf(z))
++
++
++def _hits_moments(k, nb):
++    """Mean / variance of the number of drawn balls among k fixed picks (hypergeometric)."""
++    p = N_DRAWN / nb
++    return k * p, k * p * (1 - p) * (nb - k) / (nb - 1)
++
++
++def score(ledger_path, csv_path, game=None):
++    rows = read_ledger(ledger_path)
++    draws = actual_draws(csv_path)
++    game = game or Path(csv_path).stem
++    rows = [r for r in rows if r["game"] == game]
++    if not rows:
++        print(f"No logged picks for game '{game}' in {ledger_path}.")
++        return
++    print(f"Live tracker | game {game} | ledger {ledger_path}\n")
++    print("| draw date | logged at | drawn | top-2 hits | top-5 hits | core hits | counted |")
++    print("|---|---|---|---|---|---|---|")
++    sc = []
++    nb = int(rows[0]["n_balls"])
++    for r in sorted(rows, key=lambda r: r["draw_date"]):
++        drawn = draws.get(r["draw_date"])
++        late = r["logged_at"][:10] > r["draw_date"]
++        if drawn is None:
++            print(f"| {r['draw_date']} | {r['logged_at']} | (not in CSV yet) | | | | pending |")
++            continue
++        t2, t5, co = (len(drawn & set(_parse(r[k]))) for k in ("top2", "top5", "core"))
++        status = "LATE (logged after the draw): not counted" if late else "yes"
++        print(f"| {r['draw_date']} | {r['logged_at']} | {_fmt(sorted(drawn))} | {t2} | {t5} | {co} | {status} |")
++        if not late:
++            sc.append((t2, t5, co, len(_parse(r["core"]))))
++    n = len(sc)
++    print(f"\nCounted picks: {n}")
++    if n == 0:
++        return
++    t2 = np.array([s[0] for s in sc]); t5 = np.array([s[1] for s in sc]); co = np.array([s[2] for s in sc])
++    V = sc[0][3]
++    m5, v5 = _hits_moments(5, nb)
++    m2, v2 = _hits_moments(2, nb)
++    pc = chance_core(V, nb)
++    core_hits = int((co >= 2).sum())
++    p_core = float(stats.binom.sf(core_hits - 1, n, pc))
++    both = int((t2 >= 2).sum())
++    p_both = float(stats.binom.sf(both - 1, n, chance_pair(nb)))
++    print("\n| metric | live result | chance | one-sided p (better than chance) |")
++    print("|---|---|---|---|")
++    print(f"| mean hits in top-5 | {t5.mean():.3f} | {m5:.3f} | {_z_p(t5.sum(), m5, v5, n):.3f} |")
++    print(f"| mean hits in top-2 | {t2.mean():.3f} | {m2:.3f} | {_z_p(t2.sum(), m2, v2, n):.3f} |")
++    print(f"| core-{V} hit (>= 2 of 5) | {core_hits}/{n} = {core_hits / n:.1%} | {pc:.1%} | {p_core:.3f} |")
++    print(f"| both top-2 drawn | {both}/{n} | {chance_pair(nb):.2%} | {p_both:.3f} |")
++    print("\nRead it honestly: p < 0.05 on a metric chosen in advance (core hit) after 100+ counted picks would be real "
++          "evidence. A few lucky draws early on are expected and mean nothing.")
++    if n < 100:
++        print(f"Only {n} counted picks so far: far too few for a verdict (about 100-300 are needed to see a real edge).")
++
++
++def main(argv=None):
++    ap = argparse.ArgumentParser(description="live forward-test ledger for stage4 picks")
++    sub = ap.add_subparsers(dest="cmd", required=True)
++    s = sub.add_parser("score")
++    s.add_argument("--csv", required=True, help="the game CSV, updated with the latest draws")
++    s.add_argument("--tracker", default="outputs/tracker.csv")
++    s.add_argument("--game", default="", help="game label (default: CSV name)")
++    ad = sub.add_parser("add-draw")
++    ad.add_argument("--csv", required=True)
++    ad.add_argument("--date", required=True, help="YYYY-MM-DD")
++    ad.add_argument("--numbers", nargs=N_DRAWN, required=True, type=int, help="the 5 numbers in drawn order")
++    a = ap.parse_args(argv)
++    if a.cmd == "add-draw":
++        add_draw(a.csv, a.date, a.numbers)
++    elif a.cmd == "score":
++        score(a.tracker, a.csv, a.game or None)
++
++
++if __name__ == "__main__":
++    main()
+--- a/bias_check.py
++++ b/bias_check.py
+@@ -0,0 +1,105 @@
++#!/usr/bin/env python3
++"""
++bias_check.py: is any machine biased in a way that LASTS? Run this before building or trusting any predictor.
++
++    !python bias_check.py --csv main_draw_clean.csv noonrush_clean.csv vag_clean.csv daywa_clean.csv
++
++Four tests per game, null hypothesis = a fair machine (5 balls uniformly without replacement, draws independent):
++  1. frequency     : are some balls drawn more often overall? (chi-square, corrected for drawing without replacement)
++  2. stability     : do the balls that were hot in the older half of the history stay hot in the newer half?
++                     A physical bias (heavy / worn ball) must persist, so this correlation would be clearly positive.
++  3. repeats       : do numbers from the previous draw come back more often than chance?
++  4. first ball    : is the first ball drawn uniform?
++All p-values are one family: read the Benjamini-Hochberg q column; a few raw p < 0.05 are expected by chance.
++"""
++from __future__ import annotations
++
++import argparse
++from math import comb
++from pathlib import Path
++
++import numpy as np
++import pandas as pd
++from scipy import stats
++
++K = 5
++
++
++def load(path):
++    r = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
++    r.columns = [str(c).strip() for c in r.columns]
++    v = r[[f"Number{i}" for i in range(1, K + 1)]].apply(lambda c: pd.to_numeric(c, errors="coerce"))
++    dates = pd.to_datetime(r["Date"], errors="coerce")
++    ok = v.notna().all(axis=1) & dates.notna()
++    v, dates = v[ok].astype(int).to_numpy(), dates[ok].to_numpy()
++    counts = np.bincount(v[(v >= 1).all(1)].ravel())
++    med = np.median(counts[counts > 0])
++    nb = int(np.where(counts >= max(5, 0.1 * med))[0].max())          # stray values above the pool are bad rows
++    keep = (v >= 1).all(1) & (v <= nb).all(1) & (np.array([len(set(x)) for x in v]) == K)
++    v, dates = v[keep], dates[keep]
++    v = v[np.argsort(dates, kind="stable")]                            # oldest first
++    return v, nb
++
++
++def tests(v, nb):
++    n = len(v)
++    X = np.zeros((n, nb))
++    X[np.repeat(np.arange(n), K), v.ravel() - 1] = 1
++    p = K / nb
++    c = X.sum(0)
++    e = n * p
++    chi = ((c - e) ** 2 / e).sum() / ((1 - p) * nb / (nb - 1))
++    out = {"frequency": (f"chi2 {chi:.1f} on {nb - 1} df", stats.chi2.sf(chi, nb - 1))}
++    h = n // 2
++    rho, _ = stats.pearsonr(X[:h].sum(0), X[h:].sum(0))
++    p_rho = stats.pearsonr(X[:h].sum(0), X[h:].sum(0), alternative="greater").pvalue
++    out["stability"] = (f"r = {rho:+.3f}", p_rho)
++    ov = (X[1:] * X[:-1]).sum(1)
++    pk = [comb(K, k) * comb(nb - K, K - k) / comb(nb, K) for k in range(K + 1)]
++    m = sum(k * q for k, q in enumerate(pk))
++    var = sum(k * k * q for k, q in enumerate(pk)) - m * m
++    z = (ov.mean() - m) / np.sqrt(var / len(ov))
++    out["repeats"] = (f"{ov.mean():.3f} per draw vs {m:.3f} (z {z:+.2f})", 2 * stats.norm.sf(abs(z)))
++    fb = np.bincount(v[:, 0] - 1, minlength=nb)
++    chi1 = ((fb - n / nb) ** 2 / (n / nb)).sum()
++    out["first ball"] = (f"chi2 {chi1:.1f} on {nb - 1} df", stats.chi2.sf(chi1, nb - 1))
++    return n, out
++
++
++def bh(pv):
++    pv = np.asarray(pv)
++    o = np.argsort(pv)
++    q = pv[o] * len(pv) / np.arange(1, len(pv) + 1)
++    q = np.minimum.accumulate(q[::-1])[::-1]
++    res = np.empty_like(q)
++    res[o] = np.minimum(q, 1.0)
++    return res
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--csv", nargs="+", required=True)
++    a = ap.parse_args()
++    rows = []
++    for f in a.csv:
++        v, nb = load(f)
++        n, out = tests(v, nb)
++        for name, (txt, pv) in out.items():
++            rows.append((Path(f).stem, f"5/{nb}", n, name, txt, float(pv)))
++    q = bh([r[5] for r in rows])
++    print("| game | pool | draws | test | result | raw p | BH q |")
++    print("|---|---|---|---|---|---|---|")
++    for r, qq in zip(rows, q):
++        print(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} | {r[5]:.3f} | {qq:.3f} |")
++    sig = [r for r, qq in zip(rows, q) if qq < 0.05]
++    print()
++    if sig:
++        print("BIAS SIGNAL (q < 0.05): " + "; ".join(f"{r[0]} {r[3]}" for r in sig)
++              + ". Confirm it on NEW draws before trusting it.")
++    else:
++        print("No test is significant after correcting for the number of tests: every game looks like a fair machine. "
++              "A predictor built on this history cannot beat chance.")
++
++
++if __name__ == "__main__":
++    main()

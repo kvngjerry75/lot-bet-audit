@@ -1,0 +1,16 @@
+# Sharp predictor: DayWA (2076 draws, 2019-11-26 to 2026-10-24); scored on 1776 draws, each from earlier draws only
+
+| model | 2+ in 10-core | 3+ in core | hits in top 5 | top-2 both | log-loss skill | Perm-2 back |
+|---|---|---|---|---|---|---|
+| chance | 38.1% | 9.6% | 0.641 | 1.35% | 0 | - |
+| colour / low-high only | 697 = 39.2% | 8.6% | 0.635 | 1.58% | +0.00001 | - |
+| SHARP (self-tuning hierarchical) | 702 = 39.5% | 9.7% | 0.648 | 1.46% | -0.00002 | - |
+| ORACLE (cheats, sees the future) | 766 = 43.1% | 10.0% | 0.710 | 1.91% | +0.00060 | - |
+
+SHARP vs 200 fair-machine histories (p = share of fair controls doing at least as well):
+  2+ in core: 0.3953 vs fair mean 0.3805, p = 0.114
+  hits in top 5: 0.6475 vs fair mean 0.6405, p = 0.353
+  log-loss skill: -0.0000 vs fair mean -0.0001, p = 0.129
+
+Versions it trusts most now: pull none / half-life 400 (0.26); pull none / half-life 800 (0.25); pull none / half-life 1500 (0.24)
+Current 10-ball core: [18, 5, 7, 3, 15, 6, 4, 2, 14, 10] | strongest ball x1.025 chance

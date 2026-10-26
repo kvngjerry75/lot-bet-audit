@@ -1,0 +1,36 @@
+MAIN BEAST: DayWA | 2076 draws used (2019-11-26 to 2026-10-24)
+WasShifted is constant 0: the feature carries no information on this file
+  !! torch is not installed: the TFT army (5 neural nets) is SKIPPED. In Colab it is pre-installed; on a PC: pip install torch
+  original stage 4: experts ['ranker', 'hazard', 'markov', 'anchor', 'mlp', 'booster', 'rulemine'], scoring draws 376..2075 (retrained every 100 draws). This is the slow part.
+  original stage 4 finished in 29s
+
+Backtest on draws 576..2075 (2021-11-16 to 2026-10-24; every draw forecast from earlier draws only; same draws for every row so the rows compare fairly):
+| component | 2+ in 10-core | hits in top k | trust now |
+|---|---|---|---|
+| MAIN BEAST (chance + sharp + colour) | 40.3% | 0.665 | - |
+| stage4 ORIGINAL ensemble | 37.9% | 0.632 | not a member |
+| stage4 ranker | 36.4% | 0.632 | not a member |
+| stage4 hazard | 38.4% | 0.655 | not a member |
+| stage4 markov | 37.3% | 0.649 | not a member |
+| stage4 anchor | 39.4% | 0.656 | not a member |
+| stage4 mlp | 38.0% | 0.644 | not a member |
+| stage4 booster | 37.5% | 0.629 | not a member |
+| quick frequency | 40.0% | 0.637 | not a member |
+| quick recent50 | 36.9% | 0.654 | not a member |
+| quick overdue | 36.9% | 0.606 | not a member |
+| quick markov | 37.7% | 0.621 | not a member |
+| quick boosting | 37.6% | 0.615 | not a member |
+| rule engine | 37.7% | 0.633 | not a member |
+| stage5 forecaster | 40.5% | 0.650 | not a member |
+| sharp | 39.9% | 0.662 | 0.32 |
+| colour only | 40.1% | 0.665 | 0.50 |
+| pure chance | 38.1% | 0.641 | 0.17 |
+
+16 models run in 49s; the BEAST combines chance, sharp, colour only
+
+LATEST DRAW IN YOUR DATA: 2026-10-24
+FORECASTING: the next DayWA draw after 2026-10-24, i.e. Sunday 2026-10-25.
+Forecast: top 5 [18, 5, 7, 3, 15] | 10-ball core [18, 5, 7, 3, 15, 6, 4, 2, 14, 10] | strongest ball x1.018 chance
+
+MONEY: DayWA shows no edge that survives fair-machine controls and correction for the number of models tried, and its prize table is not published, so no DayWA bet can be shown to pay.
+NOTE: your data is 2 days old. Re-scrape first for a forecast of today's draw.

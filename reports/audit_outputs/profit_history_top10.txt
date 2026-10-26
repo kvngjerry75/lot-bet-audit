@@ -1,0 +1,66 @@
+# Afriluck Perm-2 on the MAIN BEAST top-10 core: 1761 draws, 2024-12-29 to 2026-10-26
+Every draw: GH₵45 on the 45 pairs, 60x per winning pair. Forecasts made before each draw.
+
+Total staked GH₵79,245 | returned GH₵51,000 | NET GH₵-28,245 | 64.4% back (pure luck would give 56.4% back)
+
+| winners in core | draws | share | pure luck | pays |
+|---|---|---|---|---|
+| 0 | 471 | 26.7% | 29.6% | GH₵0 |
+| 1 | 734 | 41.7% | 42.3% | GH₵0 |
+| 2 | 432 | 24.5% | 22.1% | GH₵60 |
+| 3 | 110 | 6.2% | 5.4% | GH₵180 |
+| 4 | 13 | 0.7% | 0.6% | GH₵360 |
+| 5 | 1 | 0.1% | 0.0% | GH₵600 |
+| 6 | 0 | 0.0% | 0.0% | GH₵900 |
+
+## Best and worst stretches (net, after stakes)
+- 11 draws (~4 days): best GH₵+465 (2026-07-18 to 2026-07-22) | worst GH₵-495 (2025-03-03 to 2025-03-07)
+- 21 draws (~1 week): best GH₵+435 (2026-02-11 to 2026-02-18) | worst GH₵-885 (2025-03-03 to 2025-03-11)
+- 90 draws (~1 month): best GH₵-90 (2026-02-07 to 2026-03-13) | worst GH₵-2,730 (2026-01-07 to 2026-02-10)
+- 270 draws (~3 months): best GH₵-3,150 (2025-09-26 to 2026-01-07) | worst GH₵-6,030 (2026-03-28 to 2026-07-11)
+- deepest fall from a high point: GH₵-28,695 (2024-12-30 to 2026-10-22, 1751 draws)
+- biggest climb from a low point: GH₵+555 (2025-09-29 to 2025-09-29, 1 draws)
+- longest run with NO winning pair: 20 draws in a row (GH₵900 lost), ended 2026-05-05
+- longest run where EVERY draw had a winning pair: 5 draws, ended 2026-02-13
+- profitable draws (3+ in core): 124 of 1761 = 7.0% (about 1 in 14)
+
+## Month by month
+| month | draws | staked | returned | net | back | running total |
+|---|---|---|---|---|---|---|
+| 2024-12 | 6.0 | 270.0 | 240.0 | -30.0 | 89% | -30.0 |
+| 2025-01 | 85.0 | 3,825.0 | 2,160.0 | -1,665.0 | 56% | -1,695.0 |
+| 2025-02 | 76.0 | 3,420.0 | 3,060.0 | -360.0 | 89% | -2,055.0 |
+| 2025-03 | 80.0 | 3,600.0 | 1,500.0 | -2,100.0 | 42% | -4,155.0 |
+| 2025-04 | 79.0 | 3,555.0 | 2,640.0 | -915.0 | 74% | -5,070.0 |
+| 2025-05 | 85.0 | 3,825.0 | 2,400.0 | -1,425.0 | 63% | -6,495.0 |
+| 2025-06 | 80.0 | 3,600.0 | 2,160.0 | -1,440.0 | 60% | -7,935.0 |
+| 2025-07 | 85.0 | 3,825.0 | 2,880.0 | -945.0 | 75% | -8,880.0 |
+| 2025-08 | 83.0 | 3,735.0 | 1,920.0 | -1,815.0 | 51% | -10,695.0 |
+| 2025-09 | 82.0 | 3,690.0 | 2,160.0 | -1,530.0 | 59% | -12,225.0 |
+| 2025-10 | 85.0 | 3,825.0 | 2,280.0 | -1,545.0 | 60% | -13,770.0 |
+| 2025-11 | 80.0 | 3,600.0 | 2,520.0 | -1,080.0 | 70% | -14,850.0 |
+| 2025-12 | 79.0 | 3,555.0 | 2,340.0 | -1,215.0 | 66% | -16,065.0 |
+| 2026-01 | 79.0 | 3,555.0 | 1,980.0 | -1,575.0 | 56% | -17,640.0 |
+| 2026-02 | 76.0 | 3,420.0 | 2,940.0 | -480.0 | 86% | -18,120.0 |
+| 2026-03 | 74.0 | 3,330.0 | 2,340.0 | -990.0 | 70% | -19,110.0 |
+| 2026-04 | 76.0 | 3,420.0 | 2,040.0 | -1,380.0 | 60% | -20,490.0 |
+| 2026-05 | 77.0 | 3,465.0 | 1,500.0 | -1,965.0 | 43% | -22,455.0 |
+| 2026-06 | 82.0 | 3,690.0 | 2,040.0 | -1,650.0 | 55% | -24,105.0 |
+| 2026-07 | 82.0 | 3,690.0 | 3,120.0 | -570.0 | 85% | -24,675.0 |
+| 2026-08 | 83.0 | 3,735.0 | 2,460.0 | -1,275.0 | 66% | -25,950.0 |
+| 2026-09 | 79.0 | 3,555.0 | 2,160.0 | -1,395.0 | 61% | -27,345.0 |
+| 2026-10 | 68.0 | 3,060.0 | 2,160.0 | -900.0 | 71% | -28,245.0 |
+
+Winning months: 0 of 23
+
+## By session
+- evening: 651 draws, 63.9% back, net GH₵-10,575
+- Anopa: 556 draws, 60.0% back, net GH₵-10,020
+- Midday: 554 draws, 69.3% back, net GH₵-7,650
+
+## Is a hot streak skill or luck? (1,000 replays of the same draws with RANDOM cores)
+- random cores: total net -34,425 on average (system -28,245); the system beat 99.7% of random players
+- best 11-draw stretch of a random player: GH₵+525 typical, GH₵+765 for the luckiest 10% (system's best: GH₵+465)
+- winning months of a random player: 0 of 23 typical (system 0)
+
+Per-draw detail: profit_by_draw.csv  |  months: profit_by_month.csv
